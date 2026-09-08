@@ -13,10 +13,9 @@ CasaOS-style dashboard for a Linux homeserver: Netdata metrics (CPU / RAM / disk
 
 ```bash
 cp .env.example .env
-cp .env.example frontend/.env.local
 ```
 
-Set at least `NEXT_PUBLIC_API_URL=http://localhost:4000` in `frontend/.env.local`. Load the same integration vars into the backend via `.env` in the repo root (or `backend/.env`).
+Set `NEXT_PUBLIC_API_URL=http://localhost:4000` in `frontend/.env.local`. Load integration URLs, passwords, and API keys into `.env` in the repo root (or `backend/.env`). Do **not** copy passwords or API keys into `frontend/.env.local`.
 
 2. Install and run:
 
@@ -64,9 +63,13 @@ sudo systemctl enable --now homeserver-dashboard-backend
 
 ```bash
 cd frontend
-# set NEXT_PUBLIC_API_URL to http://<server-lan-or-tailscale-ip>:4000
-npm install && npm run build && npm start -- -H 0.0.0.0 -p 3000
+npm install
+# This value is baked into the browser bundle during the build.
+NEXT_PUBLIC_API_URL=http://<server-lan-or-tailscale-ip>:4000 npm run build
+npm start
 ```
+
+To start the frontend after reboots too, copy `deploy/homeserver-dashboard-frontend.service` to `/etc/systemd/system/`, edit the user/path placeholders, then enable it in the same way as the backend service.
 
 Or use Compose for the frontend only after the backend is up on the host.
 
@@ -102,6 +105,16 @@ Manual checks:
 4. Start a torrent or *arr grab — downloads panel lists it
 5. Apps tiles open the correct URLs
 6. Update modal rejects empty password; with correct sudo password, apt runs and output appears (host backend only)
+
+## Troubleshooting on the server
+
+The backend logs startup configuration (without secrets), failed integration calls, failed API requests, and update results. With systemd, watch those logs live:
+
+```bash
+sudo journalctl -u homeserver-dashboard-backend -f
+```
+
+The System endpoint discovers NVIDIA-related Netdata chart IDs and tries common collector names. If a GPU value is still blank, the journal lists the chart IDs it tried and the Netdata response that prevented it from reading the metric.
 
 ## Security notes
 

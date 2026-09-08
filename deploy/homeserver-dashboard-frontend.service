@@ -1,0 +1,17 @@
+[Unit]
+Description=Home Server Dashboard Frontend
+After=network.target homeserver-dashboard-backend.service
+
+[Service]
+Type=simple
+User=REPLACE_WITH_YOUR_USER
+WorkingDirectory=/opt/HomeServerDashboard/frontend
+Environment=NODE_ENV=production
+Environment=HOSTNAME=0.0.0.0
+Environment=PORT=3000
+ExecStart=/usr/bin/npm start
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

@@ -7,6 +7,18 @@ export class HttpError extends Error {
   }
 }
 
+function safeUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    for (const key of ["auth", "token", "apikey", "api_key", "password"]) {
+      if (parsed.searchParams.has(key)) parsed.searchParams.set(key, "[redacted]");
+    }
+    return parsed.toString();
+  } catch {
+    return "[invalid URL]";
+  }
+}
+
 
 export async function fetchJson<T>(
   url: string,
@@ -30,7 +42,7 @@ export async function fetchJson<T>(
       const body = await response.text().catch(() => "");
       throw new HttpError(
         response.status,
-        `Request failed ${response.status} for ${url}: ${body.slice(0, 200)}`,
+        `Request failed ${response.status} for ${safeUrl(url)}: ${body.slice(0, 200)}`,
       );
     }
 

@@ -1,5 +1,6 @@
 import { env } from "../lib/env.js";
 import { spawn } from "node:child_process";
+import { logError, logInfo } from "../lib/logger.js";
 
 
 export type UpdateResult = {
@@ -20,6 +21,7 @@ const ALLOWLISTED_SCRIPT = [
 
 export function runOsUpdate(password: string): Promise<UpdateResult> {
   return new Promise((resolve) => {
+    logInfo("OS update requested");
     const child = spawn(
       "sudo",
       ["-S", "-p", "", "bash", "-lc", ALLOWLISTED_SCRIPT],
@@ -57,6 +59,7 @@ export function runOsUpdate(password: string): Promise<UpdateResult> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      logError("OS update could not start", error);
       resolve({
         ok: false,
         exitCode: null,
@@ -70,6 +73,7 @@ export function runOsUpdate(password: string): Promise<UpdateResult> {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      logInfo("OS update finished", { exitCode: code, timedOut });
       resolve({
         ok: code === 0 && !timedOut,
         exitCode: code,

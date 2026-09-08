@@ -12,6 +12,8 @@ export async function settle<T>(
     return { ok: true, data };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    logError("integration request failed", error, { integration: label });
     return { ok: false, error: `${label}: ${message}` };
   }
 }
+import { logError } from "./logger.js";

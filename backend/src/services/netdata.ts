@@ -1,5 +1,6 @@
 import { env } from "../lib/env.js";
 import { fetchJson, stripTrailingSlash } from "../lib/http.js";
+import { logWarningThrottled } from "../lib/logger.js";
 
 
 export type SystemMetrics = {
@@ -33,6 +34,19 @@ type NetdataData = {
     data?: Array<Array<number | null>>;
   };
 };
+
+type NetdataChartsResponse = {
+  charts?: Record<string, unknown>;
+};
+
+type NvidiaCharts = {
+  utilization: string[];
+  memory: string[];
+  temperature: string[];
+};
+
+let cachedNvidiaCharts: NvidiaCharts | undefined;
+let nvidiaChartsCheckedAt = 0;
 
 
 function latestPoint(payload: NetdataData): Record<string, number | null> {
@@ -73,6 +87,57 @@ async function fetchChart(chart: string, after = -2): Promise<Record<string, num
   }
 }
 
+async function fetchFirstAvailableChart(
+  metric: string,
+  charts: string[],
+): Promise<Record<string, number | null>> {
+  const failures: string[] = [];
+
+  for (const chart of charts) {
+    try {
+      const point = await fetchChart(chart);
+      if (Object.keys(point).length > 0) return point;
+      failures.push(`${chart}: no dimensions returned`);
+    } catch (error) {
+      failures.push(`${chart}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  logWarningThrottled(`netdata-${metric}`, "Netdata metric unavailable", {
+    metric,
+    triedCharts: charts,
+    details: failures.join(" | ").slice(0, 1_000),
+  });
+  return {};
+}
+
+async function discoverNvidiaCharts(): Promise<NvidiaCharts> {
+  // Chart IDs only change when Netdata or its NVIDIA collector restarts.
+  if (cachedNvidiaCharts !== undefined && Date.now() - nvidiaChartsCheckedAt < 10 * 60_000) {
+    return cachedNvidiaCharts;
+  }
+  nvidiaChartsCheckedAt = Date.now();
+
+  const base = stripTrailingSlash(env.netdataUrl);
+  try {
+    const payload = await fetchJson<NetdataChartsResponse>(`${base}/api/v1/charts`);
+    const names = Object.keys(payload.charts ?? {}).filter((name) => /nvidia|gpu/i.test(name));
+    const matching = (pattern: RegExp) => names.filter((name) => pattern.test(name));
+    cachedNvidiaCharts = {
+      utilization: matching(/utili[sz]ation|gpu_util/i),
+      memory: matching(/memory|mem_usage|mem_/i),
+      temperature: matching(/temperature|temp/i),
+    };
+    return cachedNvidiaCharts;
+  } catch (error) {
+    logWarningThrottled("netdata-nvidia-discovery", "Could not discover NVIDIA charts", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    cachedNvidiaCharts = { utilization: [], memory: [], temperature: [] };
+    return cachedNvidiaCharts;
+  }
+}
+
 
 function sumValues(point: Record<string, number | null>, exclude: string[] = []): number | null {
   const values = Object.entries(point)
@@ -98,21 +163,30 @@ function firstNumber(
 
 
 export async function getSystemMetrics(): Promise<SystemMetrics> {
+  const discoveredNvidia = await discoverNvidiaCharts();
   const [cpuPoint, ramPoint, diskPoint, gpuUtil, gpuMem, gpuTemp] = await Promise.all([
-    fetchChart("system.cpu").catch(() => ({})),
-    fetchChart("system.ram").catch(() => ({})),
-    fetchChart("disk_space./").catch(() =>
-      fetchChart("disk.space").catch(() => ({})),
-    ),
-    fetchChart("nvidia_smi.gpu_utilization_gpu0").catch(() =>
-      fetchChart("nvidia_smi.gpu_utilization").catch(() => ({})),
-    ),
-    fetchChart("nvidia_smi.mem_usage_gpu0").catch(() =>
-      fetchChart("nvidia_smi.mem_usage").catch(() => ({})),
-    ),
-    fetchChart("nvidia_smi.temperature_gpu0").catch(() =>
-      fetchChart("nvidia_smi.temperature").catch(() => ({})),
-    ),
+    fetchFirstAvailableChart("CPU", ["system.cpu"]),
+    fetchFirstAvailableChart("RAM", ["system.ram"]),
+    fetchFirstAvailableChart("root disk", ["disk_space./", "disk.space"]),
+    fetchFirstAvailableChart("NVIDIA GPU utilization", [
+      "nvidia_smi.gpu_utilization_gpu0",
+      "nvidia_smi.gpu_utilization",
+      "nvidia_smi.gpu0_utilization",
+      ...discoveredNvidia.utilization,
+    ]),
+    fetchFirstAvailableChart("NVIDIA GPU memory", [
+      "nvidia_smi.mem_usage_gpu0",
+      "nvidia_smi.mem_usage",
+      "nvidia_smi.gpu0_mem_usage",
+      "nvidia_smi.gpu0_memory",
+      ...discoveredNvidia.memory,
+    ]),
+    fetchFirstAvailableChart("NVIDIA GPU temperature", [
+      "nvidia_smi.temperature_gpu0",
+      "nvidia_smi.temperature",
+      "nvidia_smi.gpu0_temperature",
+      ...discoveredNvidia.temperature,
+    ]),
   ]);
 
   const idle = firstNumber(cpuPoint, ["idle"]);
