@@ -1,0 +1,16 @@
+[Unit]
+Description=Home Server Dashboard Backend
+After=network.target
+
+[Service]
+Type=simple
+User=REPLACE_WITH_YOUR_USER
+WorkingDirectory=/opt/HomeServerDashboard/backend
+EnvironmentFile=/opt/HomeServerDashboard/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=on-failure
+RestartSec=5
+# Do not put sudo passwords in the environment.
+
+[Install]
+WantedBy=multi-user.target

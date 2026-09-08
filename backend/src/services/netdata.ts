@@ -1,0 +1,184 @@
+import { env } from "../lib/env.js";
+import { fetchJson, stripTrailingSlash } from "../lib/http.js";
+
+
+export type SystemMetrics = {
+  cpuPercent: number | null;
+  ram: {
+    usedMb: number | null;
+    totalMb: number | null;
+    percent: number | null;
+  };
+  disk: {
+    usedGb: number | null;
+    totalGb: number | null;
+    percent: number | null;
+  };
+  gpu: {
+    utilizationPercent: number | null;
+    memoryUsedMb: number | null;
+    memoryTotalMb: number | null;
+    temperatureC: number | null;
+  };
+  source: "netdata";
+};
+
+
+type NetdataData = {
+  labels?: string[];
+  data?: Array<Array<number | null>>;
+  view_update_every?: number;
+  result?: {
+    labels?: string[];
+    data?: Array<Array<number | null>>;
+  };
+};
+
+
+function latestPoint(payload: NetdataData): Record<string, number | null> {
+  const labels = payload.labels ?? payload.result?.labels ?? [];
+  const rows = payload.data ?? payload.result?.data ?? [];
+  const last = rows.at(-1);
+  if (!last || labels.length === 0) {
+    return {};
+  }
+
+  const point: Record<string, number | null> = {};
+  for (let i = 0; i < labels.length; i += 1) {
+    const label = labels[i];
+    if (!label || label === "time") continue;
+    const value = last[i];
+    point[label] = typeof value === "number" ? value : null;
+  }
+  return point;
+}
+
+
+async function fetchChart(chart: string, after = -2): Promise<Record<string, number | null>> {
+  const base = stripTrailingSlash(env.netdataUrl);
+  const url =
+    `${base}/api/v1/data?chart=${encodeURIComponent(chart)}` +
+    `&after=${after}&points=2&format=json&options=absolute`;
+
+  try {
+    const payload = await fetchJson<NetdataData>(url);
+    return latestPoint(payload);
+  } catch {
+    // Some Netdata builds prefer the v2 path for newer charts
+    const v2 =
+      `${base}/api/v2/data?contexts=${encodeURIComponent(chart)}` +
+      `&after=${after}&points=2&format=json`;
+    const payload = await fetchJson<NetdataData>(v2);
+    return latestPoint(payload);
+  }
+}
+
+
+function sumValues(point: Record<string, number | null>, exclude: string[] = []): number | null {
+  const values = Object.entries(point)
+    .filter(([key, value]) => !exclude.includes(key) && typeof value === "number")
+    .map(([, value]) => value as number);
+
+  if (values.length === 0) return null;
+  return values.reduce((a, b) => a + b, 0);
+}
+
+
+function firstNumber(
+  point: Record<string, number | null>,
+  keys: string[],
+): number | null {
+  for (const key of keys) {
+    const value = point[key];
+    if (typeof value === "number") return value;
+  }
+  const values = Object.values(point).filter((v): v is number => typeof v === "number");
+  return values[0] ?? null;
+}
+
+
+export async function getSystemMetrics(): Promise<SystemMetrics> {
+  const [cpuPoint, ramPoint, diskPoint, gpuUtil, gpuMem, gpuTemp] = await Promise.all([
+    fetchChart("system.cpu").catch(() => ({})),
+    fetchChart("system.ram").catch(() => ({})),
+    fetchChart("disk_space./").catch(() =>
+      fetchChart("disk.space").catch(() => ({})),
+    ),
+    fetchChart("nvidia_smi.gpu_utilization_gpu0").catch(() =>
+      fetchChart("nvidia_smi.gpu_utilization").catch(() => ({})),
+    ),
+    fetchChart("nvidia_smi.mem_usage_gpu0").catch(() =>
+      fetchChart("nvidia_smi.mem_usage").catch(() => ({})),
+    ),
+    fetchChart("nvidia_smi.temperature_gpu0").catch(() =>
+      fetchChart("nvidia_smi.temperature").catch(() => ({})),
+    ),
+  ]);
+
+  const idle = firstNumber(cpuPoint, ["idle"]);
+  const cpuBusy =
+    idle !== null
+      ? Math.max(0, Math.min(100, 100 - idle))
+      : sumValues(cpuPoint, ["idle", "guest", "guest_nice"]);
+
+  const ramUsed = firstNumber(ramPoint, ["used", "Used"]);
+  const ramCached = firstNumber(ramPoint, ["cached", "Cached"]) ?? 0;
+  const ramBuffers = firstNumber(ramPoint, ["buffers", "Buffers"]) ?? 0;
+  const ramFree = firstNumber(ramPoint, ["free", "Free"]) ?? 0;
+  const ramTotal =
+    ramUsed !== null
+      ? ramUsed + ramCached + ramBuffers + ramFree
+      : null;
+  const ramPercent =
+    ramUsed !== null && ramTotal && ramTotal > 0
+      ? (ramUsed / ramTotal) * 100
+      : null;
+
+  const diskAvail = firstNumber(diskPoint, ["avail", "available", "Available"]);
+  const diskUsed = firstNumber(diskPoint, ["used", "Used"]);
+  const diskTotal =
+    diskUsed !== null && diskAvail !== null ? diskUsed + diskAvail : null;
+  const diskPercent =
+    diskUsed !== null && diskTotal && diskTotal > 0
+      ? (diskUsed / diskTotal) * 100
+      : null;
+
+  // Netdata disk_space is often MiB; normalize to GiB when values look like MiB
+  const toGb = (mib: number | null): number | null =>
+    mib === null ? null : mib / 1024;
+
+  return {
+    cpuPercent: cpuBusy === null ? null : Number(cpuBusy.toFixed(1)),
+    ram: {
+      usedMb: ramUsed === null ? null : Number(ramUsed.toFixed(0)),
+      totalMb: ramTotal === null ? null : Number(ramTotal.toFixed(0)),
+      percent: ramPercent === null ? null : Number(ramPercent.toFixed(1)),
+    },
+    disk: {
+      usedGb: toGb(diskUsed) === null ? null : Number(toGb(diskUsed)!.toFixed(1)),
+      totalGb: toGb(diskTotal) === null ? null : Number(toGb(diskTotal)!.toFixed(1)),
+      percent: diskPercent === null ? null : Number(diskPercent.toFixed(1)),
+    },
+    gpu: {
+      utilizationPercent: (() => {
+        const v = firstNumber(gpuUtil, ["utilization", "gpu", "gpu0"]);
+        return v === null ? null : Number(v.toFixed(1));
+      })(),
+      memoryUsedMb: (() => {
+        const v = firstNumber(gpuMem, ["used", "memory", "fb"]);
+        return v === null ? null : Number(v.toFixed(0));
+      })(),
+      memoryTotalMb: (() => {
+        const used = firstNumber(gpuMem, ["used", "memory", "fb"]);
+        const free = firstNumber(gpuMem, ["free"]);
+        if (used !== null && free !== null) return Number((used + free).toFixed(0));
+        return null;
+      })(),
+      temperatureC: (() => {
+        const v = firstNumber(gpuTemp, ["temperature", "temp", "gpu"]);
+        return v === null ? null : Number(v.toFixed(0));
+      })(),
+    },
+    source: "netdata",
+  };
+}
