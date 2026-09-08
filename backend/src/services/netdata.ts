@@ -1,6 +1,10 @@
 import { env } from "../lib/env.js";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { fetchJson, stripTrailingSlash } from "../lib/http.js";
 import { logWarningThrottled } from "../lib/logger.js";
+
+const execFileAsync = promisify(execFile);
 
 
 export type SystemMetrics = {
@@ -20,8 +24,21 @@ export type SystemMetrics = {
     memoryUsedMb: number | null;
     memoryTotalMb: number | null;
     temperatureC: number | null;
+    powerWatts: number | null;
+    coreClockMhz: number | null;
+    memoryClockMhz: number | null;
   };
   source: "netdata";
+};
+
+type NvidiaSmi = {
+  utilizationPercent: number | null;
+  memoryUsedMb: number | null;
+  memoryTotalMb: number | null;
+  temperatureC: number | null;
+  powerWatts: number | null;
+  coreClockMhz: number | null;
+  memoryClockMhz: number | null;
 };
 
 
@@ -161,10 +178,31 @@ function firstNumber(
   return values[0] ?? null;
 }
 
+async function getNvidiaSmi(): Promise<NvidiaSmi | null> {
+  if (process.platform !== "linux") return null;
+  try {
+    const { stdout } = await execFileAsync("nvidia-smi", [
+      "--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,clocks.current.graphics,clocks.current.memory",
+      "--format=csv,noheader,nounits",
+    ]);
+    const values = stdout.trim().split("\n")[0]?.split(",").map((value) => Number.parseFloat(value.trim())) ?? [];
+    if (values.length < 7 || values.some((value) => Number.isNaN(value))) return null;
+    return {
+      utilizationPercent: values[0], memoryUsedMb: values[1], memoryTotalMb: values[2],
+      temperatureC: values[3], powerWatts: values[4], coreClockMhz: values[5], memoryClockMhz: values[6],
+    };
+  } catch (error) {
+    logWarningThrottled("nvidia-smi", "Could not read NVIDIA GPU via nvidia-smi", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
 
 export async function getSystemMetrics(): Promise<SystemMetrics> {
   const discoveredNvidia = await discoverNvidiaCharts();
-  const [cpuPoint, ramPoint, diskPoint, gpuUtil, gpuMem, gpuTemp] = await Promise.all([
+  const [cpuPoint, ramPoint, diskPoint, gpuUtil, gpuMem, gpuTemp, nvidiaSmi] = await Promise.all([
     fetchFirstAvailableChart("CPU", ["system.cpu"]),
     fetchFirstAvailableChart("RAM", ["system.ram"]),
     fetchFirstAvailableChart("root disk", ["disk_space./", "disk.space"]),
@@ -187,6 +225,7 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
       "nvidia_smi.gpu0_temperature",
       ...discoveredNvidia.temperature,
     ]),
+    getNvidiaSmi(),
   ]);
 
   const idle = firstNumber(cpuPoint, ["idle"]);
@@ -235,23 +274,27 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     },
     gpu: {
       utilizationPercent: (() => {
-        const v = firstNumber(gpuUtil, ["utilization", "gpu", "gpu0"]);
+        const v = nvidiaSmi?.utilizationPercent ?? firstNumber(gpuUtil, ["utilization", "gpu", "gpu0"]);
         return v === null ? null : Number(v.toFixed(1));
       })(),
       memoryUsedMb: (() => {
-        const v = firstNumber(gpuMem, ["used", "memory", "fb"]);
+        const v = nvidiaSmi?.memoryUsedMb ?? firstNumber(gpuMem, ["used", "memory", "fb"]);
         return v === null ? null : Number(v.toFixed(0));
       })(),
       memoryTotalMb: (() => {
+        if (nvidiaSmi?.memoryTotalMb !== null && nvidiaSmi?.memoryTotalMb !== undefined) return Number(nvidiaSmi.memoryTotalMb.toFixed(0));
         const used = firstNumber(gpuMem, ["used", "memory", "fb"]);
         const free = firstNumber(gpuMem, ["free"]);
         if (used !== null && free !== null) return Number((used + free).toFixed(0));
         return null;
       })(),
       temperatureC: (() => {
-        const v = firstNumber(gpuTemp, ["temperature", "temp", "gpu"]);
+        const v = nvidiaSmi?.temperatureC ?? firstNumber(gpuTemp, ["temperature", "temp", "gpu"]);
         return v === null ? null : Number(v.toFixed(0));
       })(),
+      powerWatts: nvidiaSmi?.powerWatts === null || nvidiaSmi?.powerWatts === undefined ? null : Number(nvidiaSmi.powerWatts.toFixed(0)),
+      coreClockMhz: nvidiaSmi?.coreClockMhz === null || nvidiaSmi?.coreClockMhz === undefined ? null : Number(nvidiaSmi.coreClockMhz.toFixed(0)),
+      memoryClockMhz: nvidiaSmi?.memoryClockMhz === null || nvidiaSmi?.memoryClockMhz === undefined ? null : Number(nvidiaSmi.memoryClockMhz.toFixed(0)),
     },
     source: "netdata",
   };

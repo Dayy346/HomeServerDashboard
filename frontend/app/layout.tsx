@@ -3,8 +3,8 @@ import "./globals.css";
 
 
 export const metadata: Metadata = {
-  title: "Home Server Dashboard",
-  description: "CasaOS replacement dashboard for system, Pi-hole, and downloads",
+  title: "Dayyan's HomeLab",
+  description: "Private AI and container operations dashboard",
 };
 
 

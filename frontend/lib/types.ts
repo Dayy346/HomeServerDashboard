@@ -15,8 +15,41 @@ export type SystemMetrics = {
     memoryUsedMb: number | null;
     memoryTotalMb: number | null;
     temperatureC: number | null;
+    powerWatts: number | null;
+    coreClockMhz: number | null;
+    memoryClockMhz: number | null;
   };
   source: "netdata";
+};
+
+export type StorageMount = {
+  mount: string;
+  usedBytes: number;
+  totalBytes: number;
+  percent: number;
+};
+
+export type HostOverview = {
+  hostname: string;
+  platform: string;
+  uptimeSeconds: number;
+  loadAverage: number[];
+  storage: StorageMount[];
+  network: { receivedBytesPerSecond: number | null; sentBytesPerSecond: number | null };
+};
+
+export type Container = {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  status: string;
+  uptime: string;
+  cpuPercent: number | null;
+  memoryUsageBytes: number | null;
+  memoryLimitBytes: number | null;
+  memoryPercent: number | null;
+  terminalCommand: string;
 };
 
 

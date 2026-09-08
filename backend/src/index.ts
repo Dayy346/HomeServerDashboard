@@ -4,8 +4,10 @@ import { assertRuntimeConfig, env } from "./lib/env.js";
 import { HttpError } from "./lib/http.js";
 import { logError, logInfo } from "./lib/logger.js";
 import { appsRouter } from "./routes/apps.js";
+import { containersRouter } from "./routes/containers.js";
 import { downloadsRouter } from "./routes/downloads.js";
 import { piholeRouter } from "./routes/pihole.js";
+import { hostRouter } from "./routes/host.js";
 import { systemRouter } from "./routes/system.js";
 import { updatesRouter } from "./routes/updates.js";
 
@@ -48,6 +50,8 @@ app.use("/api/system", systemRouter);
 app.use("/api/pihole", piholeRouter);
 app.use("/api/downloads", downloadsRouter);
 app.use("/api/apps", appsRouter);
+app.use("/api/host", hostRouter);
+app.use("/api/containers", containersRouter);
 app.use("/api/updates", updatesRouter);
 
 

@@ -13,13 +13,19 @@ export type PollState<T> = {
 export function usePolling<T>(
   fetcher: (signal: AbortSignal) => Promise<T>,
   intervalMs: number,
+  onData?: (data: T) => void,
 ): PollState<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const fetcherRef = useRef(fetcher);
 
-  fetcherRef.current = fetcher;
+  const onDataRef = useRef(onData);
+
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+    onDataRef.current = onData;
+  }, [fetcher, onData]);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +41,7 @@ export function usePolling<T>(
         if (!cancelled) {
           setData(next);
           setError(null);
+          onDataRef.current?.(next);
         }
       } catch (err) {
         if (cancelled) return;
