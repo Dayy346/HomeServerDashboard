@@ -21,8 +21,7 @@ Set `NEXT_PUBLIC_API_URL=http://localhost:4000` in `frontend/.env.local`. Load i
 
 ```bash
 make install
-make backend    # terminal 1 — http://0.0.0.0:4000
-make frontend   # terminal 2 — http://localhost:3000
+make dev        # both services in one terminal; Ctrl+C stops both
 ```
 
 ## API

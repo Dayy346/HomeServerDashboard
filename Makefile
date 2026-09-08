@@ -5,7 +5,7 @@ install:
 	cd frontend && npm install
 
 dev:
-	@echo "Run 'make backend' and 'make frontend' in separate terminals"
+	cd frontend && npx concurrently --kill-others --names backend,frontend --prefix-colors blue,magenta "cd ../backend && npm run dev" "npm run dev"
 
 backend:
 	cd backend && npm run dev
