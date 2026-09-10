@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Image from "next/image";
 import {
   ActivityIcon, ChartLineUp, Clock, Copy, Cube, Database, DownloadSimple,
   Lightning, List, Monitor, Network, SquaresFour, Terminal, X,
@@ -39,11 +40,11 @@ function value(value: number | null | undefined, suffix = ""): string {
   return value === null || value === undefined || Number.isNaN(value) ? "—" : `${value}${suffix}`;
 }
 
-function TelemetryChart({ data, label, dataKey, unit, color = "#4da3ff" }: { data: HistoryPoint[]; label: string; dataKey: "gpu" | "vram" | "temperature" | "cpu"; unit: string; color?: string }) {
+function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPoint[]; label: string; dataKey: "gpu" | "vram" | "temperature" | "cpu"; unit: string; color: string }) {
   const height = dataKey === "cpu" ? 98 : dataKey === "temperature" ? 62 : 78;
   return (
     <div className="telemetry-chart">
-      <div className="chart-heading"><span>{label}</span><strong>{data.at(-1)?.[dataKey] ?? "—"}{unit}</strong></div>
+      <div className="chart-heading"><span>{label}</span><strong style={{ color }}>{data.at(-1)?.[dataKey] ?? "—"}{unit}</strong></div>
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data} margin={{ top: 8, right: 2, left: -22, bottom: 0 }}>
           <CartesianGrid stroke="#202933" strokeDasharray="2 3" vertical={false} />
@@ -66,8 +67,8 @@ function NetworkChart({ data }: { data: NetworkPoint[] }) {
           <XAxis dataKey="time" minTickGap={42} tick={{ fill: "#6d7885", fontSize: 10 }} axisLine={false} tickLine={false} />
           <YAxis width={30} tick={{ fill: "#6d7885", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={(entry) => formatBytes(Number(entry))} />
           <Tooltip contentStyle={{ background: "#11171d", border: "1px solid #29333e", borderRadius: 6 }} labelStyle={{ color: "#cfd6df" }} formatter={(entry) => formatBytes(Number(entry))} />
-          <Line type="monotone" name="Download" dataKey="down" stroke="#4da3ff" strokeWidth={2.25} dot={false} isAnimationActive={false} />
-          <Line type="monotone" name="Upload" dataKey="up" stroke="#84bfff" strokeWidth={1.6} dot={false} isAnimationActive={false} />
+          <Line type="monotone" name="Download" dataKey="down" stroke="#a3e635" strokeWidth={2.25} dot={false} isAnimationActive={false} />
+          <Line type="monotone" name="Upload" dataKey="up" stroke="#f472b6" strokeWidth={1.6} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
       <span className="chart-legend"><i /> Download <i /> Upload</span>
@@ -125,7 +126,7 @@ export function CommandCenter() {
   return (
     <main className="command-center">
       <aside className="sidebar">
-        <div className="mark">DH</div>
+        <div className="mark"><Image src="/homelab-mark-v2.png" alt="Dayyan's HomeLab" width={72} height={72} priority /></div>
         <nav aria-label="Dashboard navigation">
           <NavItem icon={SquaresFour} label="Now" target="now" />
           <NavItem icon={Cube} label="Containers" target="containers" />
@@ -154,9 +155,9 @@ export function CommandCenter() {
           <section className="gpu-panel" id="gpu">
             <div className="panel-title"><div><h2>NVIDIA GPU</h2><span>Live telemetry</span></div><div className="gpu-meta">{system?.source === "netdata" ? "Netdata + NVIDIA SMI" : "Connecting"}</div></div>
             {systemError ? <p className="panel-error">GPU telemetry unavailable: {systemError}</p> : null}
-            <TelemetryChart data={history} label="GPU utilization" dataKey="gpu" unit="%" />
-            <TelemetryChart data={history} label="VRAM usage" dataKey="vram" unit=" MB" color="#84bfff" />
-            <TelemetryChart data={history} label="GPU temperature" dataKey="temperature" unit=" °C" color="#ffb86b" />
+            <TelemetryChart data={history} label="GPU utilization" dataKey="gpu" unit="%" color="#a78bfa" />
+            <TelemetryChart data={history} label="VRAM usage" dataKey="vram" unit=" MB" color="#2dd4bf" />
+            <TelemetryChart data={history} label="GPU temperature" dataKey="temperature" unit=" °C" color="#fb923c" />
             <div className="gpu-details">
               <div><span>GPU temperature</span><strong>{value(system?.gpu.temperatureC, " °C")}</strong></div>
               <div><span>GPU power</span><strong>{value(system?.gpu.powerWatts, " W")}</strong></div>
@@ -179,7 +180,7 @@ export function CommandCenter() {
             </div>
           </section>
 
-          <section className="cpu-panel"><TelemetryChart data={history} label="CPU utilization" dataKey="cpu" unit="%" /><div className="cpu-extra"><span>RAM</span><strong>{formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} / {formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}</strong><span>{value(system?.ram.percent, "%")}</span></div></section>
+          <section className="cpu-panel"><TelemetryChart data={history} label="CPU utilization" dataKey="cpu" unit="%" color="#facc15" /><div className="cpu-extra"><span>RAM</span><strong>{formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} / {formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}</strong><span>{value(system?.ram.percent, "%")}</span></div></section>
           <section className="services-panel"><div className="panel-title"><div><h2>Service health</h2><span>{running.length} healthy containers</span></div><ChartLineUp size={22} weight="light" /></div><div className="service-list">{containers.slice(0, 5).map((container) => <button key={container.id} onClick={() => setSelectedContainer(container.name)}><span><i className={container.state === "running" ? "status-dot" : "status-off"} />{container.name}</span><small>{container.state}</small></button>)}</div></section>
         </div>
 

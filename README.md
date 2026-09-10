@@ -11,13 +11,14 @@ The main screen is **Dayyan's HomeLab**: a black-first AI and operations view wi
 
 ## Quick start (dev)
 
-1. Copy env file and fill URLs/keys:
+1. Copy both environment examples and fill the secret values:
 
 ```bash
 cp .env.example .env
+cp frontend/.env.local.example frontend/.env.local
 ```
 
-Set `NEXT_PUBLIC_API_URL=http://localhost:4000` in `frontend/.env.local`. Load integration URLs, passwords, and API keys into `.env` in the repo root (or `backend/.env`). Do **not** copy passwords or API keys into `frontend/.env.local`.
+The examples are pre-filled for this homelab at `10.0.0.223`. If that IP changes, update it in both files before building. Load passwords and API keys into `.env` in the repo root (or `backend/.env`). Do **not** copy passwords or API keys into `frontend/.env.local`.
 
 2. Install and run:
 
