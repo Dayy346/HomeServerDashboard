@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { ThinkingOrb } from "thinking-orbs";
 import {
@@ -47,6 +47,8 @@ const iconNames: Record<string, string> = { files: "files", "actual-budget": "ac
 function appIconUrl(id: string): string {
   return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconNames[id] ?? id}.svg`;
 }
+
+const subscribeToHydration = () => () => {};
 
 function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPoint[]; label: string; dataKey: "gpu" | "vram" | "temperature" | "cpu" | "ram"; unit: string; color: string }) {
   const height = dataKey === "cpu" || dataKey === "ram" ? 74 : dataKey === "temperature" ? 62 : 78;
@@ -97,9 +99,8 @@ export function CommandCenter() {
   const [showAllContainers, setShowAllContainers] = useState(false);
   const [showDownloadLogs, setShowDownloadLogs] = useState(false);
   const [logModal, setLogModal] = useState<Container | null>(null);
-  const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
+  const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const { data: system, error: systemError } = usePolling<SystemMetrics>(
     (signal) => apiGet<SystemMetrics>("/api/system", signal),
     2_000,
