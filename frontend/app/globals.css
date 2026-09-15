@@ -58,3 +58,25 @@
 
 @media (max-width:1320px) { .dashboard-grid { grid-template-columns:1fr; }.fleet-panel,.services-panel { grid-column:auto; grid-row:auto; }.container-head,.container-row { min-width:0; grid-template-columns:16px minmax(150px,1fr) 52px 72px 130px; }.operations-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.operation-card,.mounts-card,.links-card,.updates-card { grid-column:auto; grid-row:auto; } }
 @media (max-width:700px) { .container-head,.container-row { min-width:0; grid-template-columns:14px minmax(0,1fr) 64px; }.container-head span:nth-child(3),.container-row>span { display:none; }.row-actions { display:none; }.container-name { min-width:0; }.log-dialog { width:calc(100vw - 20px); }.log-dialog .log-output { min-height:300px; font-size:9px; }.quick-links { grid-template-columns:repeat(3,minmax(0,1fr)); }.links-card .quick-links { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+
+/* Calm connection states and two readable capacity gauges replace repeated green dots and CPU/RAM traces. */
+.connection-mark { display:inline-block; width:8px; height:8px; border:2px solid #8b5cf6; border-radius:50%; box-shadow:0 0 0 3px rgba(139,92,246,.14); }
+.sidebar-foot .connection-mark { grid-column:1; grid-row:1; align-self:center; }
+.container-name > .container-state { display:inline-flex; width:auto; height:auto; grid-column:1; align-items:center; justify-content:center; border:1px solid #3c4652; border-radius:3px; padding:2px 3px; background:#151c23; color:#aeb9c4; font-size:8px; font-style:normal; line-height:1; box-shadow:none; }
+.container-name > .container-state.running { border-color:#394458; color:#b7a0ff; background:#17152a; }
+.container-name > .container-state.stopped { border-color:#5e4751; color:#e5a3b8; background:#25151b; }
+.service-state { padding:3px 6px; border:1px solid #414b57; border-radius:999px; color:#b7c1cc; font-size:10px; letter-spacing:.04em; text-transform:uppercase; }
+.healthy-state { padding:20px 0; color:#9ba8b5; }
+
+.capacity-panel { min-height:242px; padding-bottom:12px; }
+.gauge-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding-top:12px; }
+.usage-gauge { position:relative; min-height:164px; overflow:hidden; border:1px solid #283440; background:linear-gradient(135deg,#0d141b,#0a0f14); }
+.gauge-visual { position:absolute; inset:6px 10px 28px; }
+.gauge-copy { position:absolute; right:0; bottom:10px; left:0; display:grid; justify-items:center; gap:2px; text-align:center; }
+.gauge-copy span { color:#aab6c2; font-size:11px; }
+.gauge-copy strong { color:#f3f6f8; font-size:23px; letter-spacing:-.04em; }
+.gauge-copy small { max-width:100%; overflow:hidden; padding:0 8px; color:#778594; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+.usage-gauge.cpu .gauge-copy strong { color:#c4b5fd; }.usage-gauge.ram .gauge-copy strong { color:#7dd3fc; }
+.status-stat .storage-meter { width:100%; margin-top:5px; }.storage-meter b { min-width:0; background:linear-gradient(90deg,#8b5cf6,#c4a8ff); }
+
+@media (max-width:700px) { .capacity-panel { min-height:0; }.gauge-grid { grid-template-columns:1fr; }.usage-gauge { min-height:154px; }.top-status .connection-mark { display:none; } }

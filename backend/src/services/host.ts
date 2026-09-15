@@ -16,6 +16,7 @@ export type HostOverview = {
   hostname: string;
   platform: string;
   uptimeSeconds: number;
+  startedAt: string;
   loadAverage: number[];
   storage: StorageMount[];
   network: { receivedBytesPerSecond: number | null; sentBytesPerSecond: number | null };
@@ -74,10 +75,12 @@ async function networkRate(): Promise<HostOverview["network"]> {
 
 export async function getHostOverview(): Promise<HostOverview> {
   const [mounts, network] = await Promise.all([storage().catch(() => []), networkRate().catch(() => ({ receivedBytesPerSecond: null, sentBytesPerSecond: null }))]);
+  const uptimeSeconds = os.uptime();
   return {
     hostname: os.hostname(),
     platform: `${os.platform()} ${os.release()}`,
-    uptimeSeconds: os.uptime(),
+    uptimeSeconds,
+    startedAt: new Date(Date.now() - uptimeSeconds * 1000).toISOString(),
     loadAverage: os.loadavg(),
     storage: mounts,
     network,

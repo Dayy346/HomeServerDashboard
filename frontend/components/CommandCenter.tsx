@@ -7,7 +7,7 @@ import {
   ActivityIcon, ChartLineUp, Clock, Copy, Cube, Database, DownloadSimple,
   HardDrives, Lightning, List, Monitor, Network, SquaresFour, Terminal, WarningCircle, X,
 } from "@phosphor-icons/react";
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiGet } from "../lib/api";
 import type { AppTile, Container, DiagnosticsReport, DownloadsResponse, HostOverview, PiholeStats, SystemMetrics } from "../lib/types";
 import { usePolling } from "../lib/usePolling";
@@ -42,6 +42,19 @@ function value(value: number | null | undefined, suffix = ""): string {
   return value === null || value === undefined || Number.isNaN(value) ? "—" : `${value}${suffix}`;
 }
 
+function easternDateTime(value: string | undefined): string {
+  if (!value) return "Calculating start time…";
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZoneName: "short",
+  }).format(new Date(value));
+}
+
 const iconNames: Record<string, string> = { files: "files", "actual-budget": "actual-budget", ollama: "ollama", searxng: "searxng", sonarr: "sonarr", dozzle: "dozzle", "open-webui": "open-webui", pihole: "pi-hole", plex: "plex", immich: "immich", radarr: "radarr", qbittorrent: "qbittorrent", netdata: "netdata", syncthing: "syncthing", turbodiffusion: "turbodiffusion", casaos: "casaos" };
 
 function appIconUrl(id: string): string {
@@ -65,6 +78,26 @@ function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPo
           <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2.25} dot={false} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+function UsageGauge({ label, percent, detail, tone }: { label: string; percent: number | null | undefined; detail: string; tone: "cpu" | "ram" }) {
+  const safePercent = Math.min(100, Math.max(0, percent ?? 0));
+  const color = tone === "cpu"
+    ? safePercent > 80 ? "#fb7185" : safePercent > 55 ? "#fbbf24" : "#a78bfa"
+    : safePercent > 85 ? "#fb7185" : safePercent > 65 ? "#fb923c" : "#38bdf8";
+
+  return (
+    <div className={`usage-gauge ${tone}`}>
+      <div className="gauge-visual" aria-hidden="true">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadialBarChart cx="50%" cy="73%" innerRadius="70%" outerRadius="100%" startAngle={180} endAngle={0} data={[{ value: safePercent, fill: color }]} barSize={12}>
+            <RadialBar dataKey="value" background={{ fill: "#222b35" }} cornerRadius={8} isAnimationActive={false} />
+          </RadialBarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="gauge-copy"><span>{label}</span><strong>{percent === null || percent === undefined ? "—" : `${Math.round(percent)}%`}</strong><small>{detail}</small></div>
     </div>
   );
 }
@@ -162,19 +195,19 @@ export function CommandCenter() {
           <NavItem icon={DownloadSimple} label="Downloads" target="operations" />
           <NavItem icon={WarningCircle} label="Diagnostics" target="diagnostics" />
         </nav>
-        <div className="sidebar-foot"><span className="status-dot" /> <span>Host online</span><small>{host?.hostname ?? "homelab"}</small></div>
+        <div className="sidebar-foot"><span className="connection-mark" aria-hidden="true" /> <span>Live connection</span><small>{host?.hostname ?? "homelab"}</small></div>
       </aside>
 
       <section className="workspace" id="now">
         <header className="topbar">
           <div><h1>Dayyan&apos;s HomeLab</h1></div>
-          <div className="top-status"><span className="status-dot" /> <span>All systems operational</span><span className="top-separator" /> <span>Updated {metricsFreshness}</span></div>
+          <div className="top-status"><span className="connection-mark" aria-hidden="true" /> <span>Host connected</span><span className="top-separator" /> <span>Updated {metricsFreshness}</span></div>
         </header>
 
         <section className="status-strip" id="host-status">
-          <div className="status-stat"><Clock size={23} weight="light" /><div><span>Uptime</span><strong>{duration(host?.uptimeSeconds)}</strong><small>{host?.hostname ?? "Host"}</small></div></div>
+          <div className="status-stat"><Clock size={23} weight="light" /><div><span>Uptime</span><strong>{duration(host?.uptimeSeconds)}</strong><small>On since {easternDateTime(host?.startedAt)}</small></div></div>
           <div className="status-stat"><Network size={23} weight="light" /><div><span>Network</span><strong>↓ {formatBytes(host?.network.receivedBytesPerSecond)}/s <em>↑ {formatBytes(host?.network.sentBytesPerSecond)}/s</em></strong><small>Live host traffic</small></div></div>
-          <div className="status-stat" id="storage"><Database size={23} weight="light" /><div><span>Storage</span><strong>{host?.storage[0] ? `${formatBytes(host.storage[0].usedBytes)} / ${formatBytes(host.storage[0].totalBytes)}` : "—"}</strong><small>{host?.storage[0]?.mount ?? "No mount data"}</small></div></div>
+          <div className="status-stat" id="storage"><Database size={23} weight="light" /><div><span>Storage</span><strong>{host?.storage[0] ? `${formatBytes(host.storage[0].usedBytes)} / ${formatBytes(host.storage[0].totalBytes)}` : "—"}</strong><small>{host?.storage[0]?.mount ?? "No mount data"}</small><i className="stat-meter storage-meter"><b style={{ width: `${host?.storage[0]?.percent ?? 0}%` }} /></i></div></div>
           <div className="status-stat"><ActivityIcon size={23} weight="light" /><div><span>System load</span><strong>CPU {value(system?.cpuPercent, "%")} <em>RAM {value(system?.ram.percent, "%")}</em></strong><small>{host?.loadAverage[0]?.toFixed(2) ?? "—"} load average</small></div></div>
         </section>
 
@@ -199,7 +232,7 @@ export function CommandCenter() {
             <div className="container-table" role="table">
               <div className="container-head" role="row"><span>Status</span><span>Name</span><span>CPU</span><span>RAM</span><span>Actions</span></div>
               {visibleContainers.map((container) => <div className={`container-row ${activeName === container.name ? "selected" : ""}`} key={container.id} role="row">
-                <button className="container-name" onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><i className={container.state === "running" ? "status-dot" : "status-off"} /><span>{container.name}<small>{container.image}</small></span></button>
+                <button className="container-name" onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><i className={container.state === "running" ? "container-state running" : "container-state stopped"}>{container.state === "running" ? "On" : "Off"}</i><span>{container.name}<small>{container.image}</small></span></button>
                 <span>{value(container.cpuPercent, "%")}</span><span>{formatBytes(container.memoryUsageBytes)}</span>
                 <div className="row-actions"><button aria-label={`View ${container.name} logs`} onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><List size={16} />Logs</button><button aria-label={`Open ${container.name} terminal command`} onClick={() => void copyCommand(container)}><Terminal size={16} />Terminal</button></div>
               </div>)}
@@ -207,12 +240,12 @@ export function CommandCenter() {
             </div>
           </section>
 
-          <section className="cpu-panel"><TelemetryChart data={history} label="CPU utilization" dataKey="cpu" unit="%" color="#facc15" /><TelemetryChart data={history} label="RAM utilization" dataKey="ram" unit="%" color="#60a5fa" /><div className="cpu-extra"><span>RAM</span><strong>{formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} / {formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}</strong><span>{value(system?.ram.percent, "%")}</span></div></section>
-          <section className="services-panel"><div className="panel-title"><div><h2>Needs attention</h2><span>{attentionContainers.length ? `${attentionContainers.length} container${attentionContainers.length === 1 ? "" : "s"} stopped` : "No stopped containers"}</span></div><ChartLineUp size={22} weight="light" /></div><div className="service-list">{attentionContainers.length ? attentionContainers.map((container) => <button key={container.id} onClick={() => setSelectedContainer(container.name)}><span><i className="status-off" />{container.name}</span><small>{container.status}</small></button>) : <p className="healthy-state"><i className="status-dot" /> Everything is running.</p>}</div></section>
+          <section className="cpu-panel capacity-panel"><div className="panel-title"><div><h2>Host capacity</h2><span>Current system usage</span></div><ActivityIcon size={22} weight="light" /></div><div className="gauge-grid"><UsageGauge label="CPU usage" percent={system?.cpuPercent} detail={`${host?.loadAverage[0]?.toFixed(2) ?? "—"} load average`} tone="cpu" /><UsageGauge label="Memory" percent={system?.ram.percent} detail={`${formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} of ${formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}`} tone="ram" /></div></section>
+          <section className="services-panel"><div className="panel-title"><div><h2>Needs attention</h2><span>{attentionContainers.length ? `${attentionContainers.length} container${attentionContainers.length === 1 ? "" : "s"} stopped` : "No stopped containers"}</span></div><ChartLineUp size={22} weight="light" /></div><div className="service-list">{attentionContainers.length ? attentionContainers.map((container) => <button key={container.id} onClick={() => setSelectedContainer(container.name)}><span><i className="status-off" />{container.name}</span><small>{container.status}</small></button>) : <p className="healthy-state">No action needed — every container is running.</p>}</div></section>
         </div>
 
         <section className="operations-grid" id="operations">
-          <article className="operation-card"><div className="panel-title"><div><h2>Pi-hole</h2><span>DNS protection</span></div><i className="status-dot" /></div><strong className="operation-number">{pihole?.blockedPercent === null || pihole?.blockedPercent === undefined ? "—" : `${pihole.blockedPercent}%`}</strong><p>Blocked today: {pihole?.blockedToday?.toLocaleString() ?? "—"} · {pihole?.uniqueClients ?? "—"} clients</p></article>
+          <article className="operation-card"><div className="panel-title"><div><h2>Pi-hole</h2><span>DNS protection</span></div><span className="service-state">Live</span></div><strong className="operation-number">{pihole?.blockedPercent === null || pihole?.blockedPercent === undefined ? "—" : `${pihole.blockedPercent}%`}</strong><p>Blocked today: {pihole?.blockedToday?.toLocaleString() ?? "—"} · {pihole?.uniqueClients ?? "—"} clients</p></article>
           <article className="operation-card download-card"><div className="panel-title"><div><h2>Active downloads</h2><span>{downloads?.items.length ?? 0} in progress</span></div><button className="quiet-button" onClick={() => setShowDownloadLogs((current) => !current)}>{showDownloadLogs ? "Hide log" : "View log"}</button></div>{downloads?.items.length ? <ul className="download-list">{downloads.items.map((item) => <li key={item.id}><div><span>{item.name}</span><small>{item.source} · {item.state} · ↓ {formatBytes(item.downloadSpeedBps)}/s</small></div><strong>{item.progress}%</strong><i><b style={{ width: `${item.progress}%` }} /></i></li>)}</ul> : <p>No active downloads.</p>}{showDownloadLogs ? <pre className="download-log">{downloadLogs?.logs ?? "Loading qBittorrent log…"}</pre> : null}</article>
           <article className="operation-card mounts-card"><div className="panel-title"><div><h2>Storage mounts</h2><span>{host?.storage.length ?? 0} persistent disks</span></div><HardDrives size={21} weight="light" /></div>{host?.storage.length ? <div className="mount-grid">{host.storage.map((mount) => <div className="mount-card" key={mount.mount}><div><HardDrives size={19} weight="duotone" /><span>{mount.mount === "/" ? "System" : mount.mount.split("/").filter(Boolean).at(-1)}</span><strong>{mount.percent}%</strong></div><small>{formatBytes(mount.usedBytes)} of {formatBytes(mount.totalBytes)}</small><i><b style={{ width: `${mount.percent}%` }} /></i></div>)}</div> : <p>Mount details appear when the dashboard runs on Linux.</p>}</article>
           <article className="operation-card network-card"><div className="panel-title"><div><h2>Network trend</h2><span>Live host traffic</span></div><Network size={21} weight="light" /></div><NetworkChart data={networkHistory} /></article>

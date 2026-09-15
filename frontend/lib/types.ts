@@ -33,6 +33,7 @@ export type HostOverview = {
   hostname: string;
   platform: string;
   uptimeSeconds: number;
+  startedAt: string;
   loadAverage: number[];
   storage: StorageMount[];
   network: { receivedBytesPerSecond: number | null; sentBytesPerSecond: number | null };
