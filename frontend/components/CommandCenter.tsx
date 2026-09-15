@@ -164,7 +164,7 @@ export function CommandCenter() {
 
       <section className="workspace" id="now">
         <header className="topbar">
-          <div><h1>Dayyan&apos;s HomeLab</h1><p>AI workloads <span>•</span> containers <span>•</span> observe <span>•</span> control</p></div>
+          <div><h1>Dayyan&apos;s HomeLab</h1></div>
           <div className="top-status"><span className="status-dot" /> <span>All systems operational</span><span className="top-separator" /> <span>Updated {metricsFreshness}</span></div>
         </header>
 
