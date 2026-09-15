@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Image from "next/image";
+import { ThinkingOrb } from "thinking-orbs";
 import {
   ActivityIcon, ChartLineUp, Clock, Copy, Cube, Database, DownloadSimple,
   HardDrives, Lightning, List, Monitor, Network, SquaresFour, Terminal, WarningCircle, X,
@@ -41,8 +42,10 @@ function value(value: number | null | undefined, suffix = ""): string {
   return value === null || value === undefined || Number.isNaN(value) ? "—" : `${value}${suffix}`;
 }
 
-function appFavicon(url: string): string | null {
-  try { return new URL("/favicon.ico", url).toString(); } catch { return null; }
+const iconNames: Record<string, string> = { files: "files", "actual-budget": "actual-budget", ollama: "ollama", searxng: "searxng", sonarr: "sonarr", dozzle: "dozzle", "open-webui": "open-webui", pihole: "pi-hole", plex: "plex", immich: "immich", radarr: "radarr", qbittorrent: "qbittorrent", netdata: "netdata", syncthing: "syncthing", turbodiffusion: "turbodiffusion", casaos: "casaos" };
+
+function appIconUrl(id: string): string {
+  return `https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/${iconNames[id] ?? id}.svg`;
 }
 
 function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPoint[]; label: string; dataKey: "gpu" | "vram" | "temperature" | "cpu" | "ram"; unit: string; color: string }) {
@@ -93,6 +96,7 @@ export function CommandCenter() {
   const [showTerminal, setShowTerminal] = useState<Container | null>(null);
   const [showAllContainers, setShowAllContainers] = useState(false);
   const [showDownloadLogs, setShowDownloadLogs] = useState(false);
+  const [logModal, setLogModal] = useState<Container | null>(null);
   const [copied, setCopied] = useState(false);
   const { data: system, error: systemError } = usePolling<SystemMetrics>(
     (signal) => apiGet<SystemMetrics>("/api/system", signal),
@@ -128,6 +132,10 @@ export function CommandCenter() {
     (signal) => activeName ? apiGet<LogsResponse>(`/api/containers/${encodeURIComponent(activeName)}/logs?tail=180`, signal) : Promise.resolve({ name: "", logs: "No container selected." }),
     2_500,
   );
+  const { data: modalLogs, error: modalLogsError } = usePolling<LogsResponse>(
+    (signal) => logModal ? apiGet<LogsResponse>(`/api/containers/${encodeURIComponent(logModal.name)}/logs?tail=280`, signal) : Promise.resolve({ name: "", logs: "" }),
+    2_500,
+  );
 
   const running = useMemo(() => containers.filter((container) => container.state === "running"), [containers]);
   const selected = containers.find((container) => container.name === activeName) ?? null;
@@ -161,15 +169,15 @@ export function CommandCenter() {
         </header>
 
         <section className="status-strip" id="host-status">
-          <div className="status-stat"><Clock size={23} weight="light" /><div><span>Uptime</span><strong>{duration(host?.uptimeSeconds)}</strong><small>{host?.hostname ?? "Host"}</small><i className="stat-meter calm"><b style={{ width: "68%" }} /></i></div></div>
-          <div className="status-stat"><Network size={23} weight="light" /><div><span>Network</span><strong>↓ {formatBytes(host?.network.receivedBytesPerSecond)}/s <em>↑ {formatBytes(host?.network.sentBytesPerSecond)}/s</em></strong><small>Live host traffic</small><i className="stat-meter network-meter"><b /></i></div></div>
-          <div className="status-stat" id="storage"><Database size={23} weight="light" /><div><span>Storage</span><strong>{host?.storage[0] ? `${formatBytes(host.storage[0].usedBytes)} / ${formatBytes(host.storage[0].totalBytes)}` : "—"}</strong><small>{host?.storage[0]?.mount ?? "No mount data"}</small><i className="stat-meter storage-meter"><b style={{ width: `${host?.storage[0]?.percent ?? 0}%` }} /></i></div></div>
-          <div className="status-stat"><ActivityIcon size={23} weight="light" /><div><span>System load</span><strong>CPU {value(system?.cpuPercent, "%")} <em>RAM {value(system?.ram.percent, "%")}</em></strong><small>{host?.loadAverage[0]?.toFixed(2) ?? "—"} load average</small><i className="stat-meter cpu-meter"><b style={{ width: `${system?.cpuPercent ?? 0}%` }} /></i></div></div>
+          <div className="status-stat"><Clock size={23} weight="light" /><div><span>Uptime</span><strong>{duration(host?.uptimeSeconds)}</strong><small>{host?.hostname ?? "Host"}</small></div></div>
+          <div className="status-stat"><Network size={23} weight="light" /><div><span>Network</span><strong>↓ {formatBytes(host?.network.receivedBytesPerSecond)}/s <em>↑ {formatBytes(host?.network.sentBytesPerSecond)}/s</em></strong><small>Live host traffic</small></div></div>
+          <div className="status-stat" id="storage"><Database size={23} weight="light" /><div><span>Storage</span><strong>{host?.storage[0] ? `${formatBytes(host.storage[0].usedBytes)} / ${formatBytes(host.storage[0].totalBytes)}` : "—"}</strong><small>{host?.storage[0]?.mount ?? "No mount data"}</small></div></div>
+          <div className="status-stat"><ActivityIcon size={23} weight="light" /><div><span>System load</span><strong>CPU {value(system?.cpuPercent, "%")} <em>RAM {value(system?.ram.percent, "%")}</em></strong><small>{host?.loadAverage[0]?.toFixed(2) ?? "—"} load average</small></div></div>
         </section>
 
         <div className="dashboard-grid">
           <section className="gpu-panel" id="gpu">
-            <div className="panel-title"><div><h2>NVIDIA GPU</h2><span>Live telemetry</span></div><div className="gpu-meta">{system?.source === "netdata" ? "Netdata + NVIDIA SMI" : "Connecting"}</div></div>
+            <div className="panel-title"><div><h2>NVIDIA GPU</h2><span>Live telemetry</span></div><div className="gpu-meta">{system?.source === "netdata" ? "Netdata + NVIDIA SMI" : <><ThinkingOrb state="connecting" size={20} theme="dark" aria-label="Connecting to GPU telemetry" />Connecting</>}</div></div>
             {systemError ? <p className="panel-error">GPU telemetry unavailable: {systemError}</p> : null}
             <TelemetryChart data={history} label="GPU utilization" dataKey="gpu" unit="%" color="#a78bfa" />
             <TelemetryChart data={history} label="VRAM usage" dataKey="vram" unit=" MB" color="#2dd4bf" />
@@ -188,9 +196,9 @@ export function CommandCenter() {
             <div className="container-table" role="table">
               <div className="container-head" role="row"><span>Status</span><span>Name</span><span>CPU</span><span>RAM</span><span>Actions</span></div>
               {visibleContainers.map((container) => <div className={`container-row ${activeName === container.name ? "selected" : ""}`} key={container.id} role="row">
-                <button className="container-name" onClick={() => setSelectedContainer(container.name)}><i className={container.state === "running" ? "status-dot" : "status-off"} /><span>{container.name}<small>{container.image}</small></span></button>
+                <button className="container-name" onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><i className={container.state === "running" ? "status-dot" : "status-off"} /><span>{container.name}<small>{container.image}</small></span></button>
                 <span>{value(container.cpuPercent, "%")}</span><span>{formatBytes(container.memoryUsageBytes)}</span>
-                <div className="row-actions"><button aria-label={`View ${container.name} logs`} onClick={() => setSelectedContainer(container.name)}><List size={16} />Logs</button><button aria-label={`Open ${container.name} terminal command`} onClick={() => void copyCommand(container)}><Terminal size={16} />Terminal</button></div>
+                <div className="row-actions"><button aria-label={`View ${container.name} logs`} onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><List size={16} />Logs</button><button aria-label={`Open ${container.name} terminal command`} onClick={() => void copyCommand(container)}><Terminal size={16} />Terminal</button></div>
               </div>)}
               {!containers.length && !containersError ? <p className="empty-state">Reading Docker containers…</p> : null}
             </div>
@@ -200,18 +208,18 @@ export function CommandCenter() {
           <section className="services-panel"><div className="panel-title"><div><h2>Needs attention</h2><span>{attentionContainers.length ? `${attentionContainers.length} container${attentionContainers.length === 1 ? "" : "s"} stopped` : "No stopped containers"}</span></div><ChartLineUp size={22} weight="light" /></div><div className="service-list">{attentionContainers.length ? attentionContainers.map((container) => <button key={container.id} onClick={() => setSelectedContainer(container.name)}><span><i className="status-off" />{container.name}</span><small>{container.status}</small></button>) : <p className="healthy-state"><i className="status-dot" /> Everything is running.</p>}</div></section>
         </div>
 
-        <section className="log-panel" aria-live="polite">
-          <div className="log-toolbar"><div><h2>Live container log</h2><span>{selected?.name ?? "Select a container"}</span></div><div><button className="quiet-button" onClick={() => activeName && setSelectedContainer(activeName)}><Monitor size={16} />Live</button><button className="quiet-button" onClick={() => selected && void copyCommand(selected)} disabled={selected === null}><Terminal size={16} />Terminal</button></div></div>
-          {logsError ? <p className="panel-error">Log stream unavailable: {logsError}</p> : <pre className="log-output">{logsData?.logs || "Waiting for container output…"}</pre>}
-        </section>
-
         <section className="operations-grid" id="operations">
           <article className="operation-card"><div className="panel-title"><div><h2>Pi-hole</h2><span>DNS protection</span></div><i className="status-dot" /></div><strong className="operation-number">{pihole?.blockedPercent === null || pihole?.blockedPercent === undefined ? "—" : `${pihole.blockedPercent}%`}</strong><p>Blocked today: {pihole?.blockedToday?.toLocaleString() ?? "—"} · {pihole?.uniqueClients ?? "—"} clients</p></article>
           <article className="operation-card download-card"><div className="panel-title"><div><h2>Active downloads</h2><span>{downloads?.items.length ?? 0} in progress</span></div><button className="quiet-button" onClick={() => setShowDownloadLogs((current) => !current)}>{showDownloadLogs ? "Hide log" : "View log"}</button></div>{downloads?.items.length ? <ul className="download-list">{downloads.items.map((item) => <li key={item.id}><div><span>{item.name}</span><small>{item.source} · {item.state} · ↓ {formatBytes(item.downloadSpeedBps)}/s</small></div><strong>{item.progress}%</strong><i><b style={{ width: `${item.progress}%` }} /></i></li>)}</ul> : <p>No active downloads.</p>}{showDownloadLogs ? <pre className="download-log">{downloadLogs?.logs ?? "Loading qBittorrent log…"}</pre> : null}</article>
           <article className="operation-card mounts-card"><div className="panel-title"><div><h2>Storage mounts</h2><span>{host?.storage.length ?? 0} persistent disks</span></div><HardDrives size={21} weight="light" /></div>{host?.storage.length ? <div className="mount-grid">{host.storage.map((mount) => <div className="mount-card" key={mount.mount}><div><HardDrives size={19} weight="duotone" /><span>{mount.mount === "/" ? "System" : mount.mount.split("/").filter(Boolean).at(-1)}</span><strong>{mount.percent}%</strong></div><small>{formatBytes(mount.usedBytes)} of {formatBytes(mount.totalBytes)}</small><i><b style={{ width: `${mount.percent}%` }} /></i></div>)}</div> : <p>Mount details appear when the dashboard runs on Linux.</p>}</article>
           <article className="operation-card network-card"><div className="panel-title"><div><h2>Network trend</h2><span>Live host traffic</span></div><Network size={21} weight="light" /></div><NetworkChart data={networkHistory} /></article>
-          <article className="operation-card links-card"><div className="panel-title"><div><h2>Quick links</h2><span>{apps?.apps.length ?? 0} services</span></div><Monitor size={21} weight="light" /></div><div className="quick-links">{apps?.apps.map((app) => <a key={app.id} href={app.url} target="_blank" rel="noreferrer"><span className="app-thumb">{appFavicon(app.url) ? <img src={appFavicon(app.url)!} alt="" onError={(event) => { event.currentTarget.style.display = "none"; }} /> : null}</span><small>{app.name}</small></a>)}{!apps?.apps.length ? <p>Set APP_*_URL values to add links.</p> : null}</div></article>
+          <article className="operation-card links-card"><div className="panel-title"><div><h2>Quick links</h2><span>{apps?.apps.length ?? 0} services</span></div><Monitor size={21} weight="light" /></div><div className="quick-links">{apps?.apps.map((app) => <a key={app.id} href={app.url} target="_blank" rel="noreferrer"><span className="app-thumb"><img src={appIconUrl(app.id)} alt="" /></span><small>{app.name}</small></a>)}{!apps?.apps.length ? <p>Set APP_*_URL values to add links.</p> : null}</div></article>
           <UpdateButton />
+        </section>
+
+        <section className="log-panel log-panel-bottom" aria-live="polite">
+          <div className="log-toolbar"><div><h2>Live container log</h2><span>{selected?.name ?? "Select a container"}</span></div><div><button className="quiet-button" onClick={() => activeName && setSelectedContainer(activeName)}><Monitor size={16} />Live</button><button className="quiet-button" onClick={() => selected && void copyCommand(selected)} disabled={selected === null}><Terminal size={16} />Terminal</button></div></div>
+          {logsError ? <p className="panel-error">Log stream unavailable: {logsError}</p> : <pre className="log-output">{logsData?.logs || "Waiting for container output…"}</pre>}
         </section>
 
         <section className="diagnostics-panel" id="diagnostics">
@@ -225,6 +233,7 @@ export function CommandCenter() {
         </section>
       </section>
 
+      {logModal ? <div className="terminal-modal" role="presentation"><div className="log-dialog" role="dialog" aria-modal="true" aria-labelledby="container-log-title"><button className="dialog-close" onClick={() => setLogModal(null)} aria-label="Close container logs"><X size={20} /></button><div className="log-toolbar"><div><h2 id="container-log-title">{logModal.name} logs</h2><span>Live refresh every 2.5 seconds</span></div><button className="quiet-button" onClick={() => void copyCommand(logModal)}><Terminal size={16} />Terminal</button></div>{modalLogsError ? <p className="panel-error">Log stream unavailable: {modalLogsError}</p> : <pre className="log-output">{modalLogs?.logs || "Loading container logs…"}</pre>}</div></div> : null}
       {showTerminal ? <div className="terminal-modal" role="presentation"><div className="terminal-dialog" role="dialog" aria-modal="true" aria-labelledby="terminal-title"><button className="dialog-close" onClick={() => setShowTerminal(null)} aria-label="Close terminal instructions"><X size={20} /></button><Terminal size={26} weight="light" /><h2 id="terminal-title">Open {showTerminal.name}</h2><p>A browser cannot safely host a privileged Docker shell. This command has been copied so you can paste it into your server terminal.</p><code>{showTerminal.terminalCommand}</code><div><button onClick={() => void copyCommand(showTerminal)}><Copy size={17} />{copied ? "Copied" : "Copy command"}</button><button className="quiet-button" onClick={() => setShowTerminal(null)}>Close</button></div></div></div> : null}
     </main>
   );

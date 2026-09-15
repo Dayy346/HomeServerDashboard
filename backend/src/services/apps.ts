@@ -29,6 +29,7 @@ export function getAppTiles(): AppTile[] {
       name: "TurboDiffusion",
       url: env.apps.turboDiffusion,
     },
+    { id: "casaos", name: "CasaOS App Store", url: env.apps.casaosAppStore },
   ];
 
   return catalog.filter((app) => Boolean(app.url));

@@ -53,6 +53,7 @@ export const env = {
     netdata: optional("APP_NETDATA_URL"),
     syncthing: optional("APP_SYNCTHING_URL"),
     turboDiffusion: optional("APP_TURBODIFFUSION_URL"),
+    casaosAppStore: optional("APP_CASAOS_APP_STORE_URL"),
   },
 };
 

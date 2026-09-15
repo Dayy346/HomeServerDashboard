@@ -31,7 +31,7 @@ export function UpdateButton() {
   }
 
   return (
-    <section className="panel">
+    <section className="panel updates-card">
       <h2>OS updates</h2>
       <p className="muted">
         Runs allowlisted <code>apt-get update &amp;&amp; apt-get upgrade -y</code> via
