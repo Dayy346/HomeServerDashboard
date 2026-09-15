@@ -1,5 +1,6 @@
 import { env } from "../lib/env.js";
 import { execFile } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { fetchJson, stripTrailingSlash } from "../lib/http.js";
 import { logWarningThrottled } from "../lib/logger.js";
@@ -64,6 +65,50 @@ type NvidiaCharts = {
 
 let cachedNvidiaCharts: NvidiaCharts | undefined;
 let nvidiaChartsCheckedAt = 0;
+let previousCpuSample: { total: number; idle: number } | undefined;
+
+async function getHostCpuPercent(): Promise<number | null> {
+  if (process.platform !== "linux") return null;
+
+  try {
+    const firstLine = (await readFile("/proc/stat", "utf8")).split("\n")[0];
+    const fields = firstLine?.trim().split(/\s+/).slice(1).map(Number) ?? [];
+    if (fields.length < 5 || fields.some((value) => !Number.isFinite(value))) return null;
+
+    const idle = fields[3] + fields[4]; // idle + iowait
+    const total = fields.reduce((sum, value) => sum + value, 0);
+    const previous = previousCpuSample;
+    previousCpuSample = { total, idle };
+    if (!previous) return null;
+
+    const totalDelta = total - previous.total;
+    const idleDelta = idle - previous.idle;
+    if (totalDelta <= 0) return null;
+    return Math.max(0, Math.min(100, ((totalDelta - idleDelta) / totalDelta) * 100));
+  } catch {
+    return null;
+  }
+}
+
+async function getHostRam(): Promise<{ usedMb: number; totalMb: number; percent: number } | null> {
+  if (process.platform !== "linux") return null;
+
+  try {
+    const values = new Map<string, number>();
+    for (const line of (await readFile("/proc/meminfo", "utf8")).split("\n")) {
+      const match = line.match(/^(\w+):\s+(\d+)\s+kB$/);
+      if (match) values.set(match[1], Number(match[2]));
+    }
+    const totalKb = values.get("MemTotal");
+    const availableKb = values.get("MemAvailable");
+    if (!totalKb || availableKb === undefined) return null;
+    const usedMb = (totalKb - availableKb) / 1024;
+    const totalMb = totalKb / 1024;
+    return { usedMb, totalMb, percent: (usedMb / totalMb) * 100 };
+  } catch {
+    return null;
+  }
+}
 
 
 function latestPoint(payload: NetdataData): Record<string, number | null> {
@@ -202,7 +247,7 @@ async function getNvidiaSmi(): Promise<NvidiaSmi | null> {
 
 export async function getSystemMetrics(): Promise<SystemMetrics> {
   const discoveredNvidia = await discoverNvidiaCharts();
-  const [cpuPoint, ramPoint, diskPoint, gpuUtil, gpuMem, gpuTemp, nvidiaSmi] = await Promise.all([
+  const [cpuPoint, ramPoint, diskPoint, gpuUtil, gpuMem, gpuTemp, nvidiaSmi, hostCpuPercent, hostRam] = await Promise.all([
     fetchFirstAvailableChart("CPU", ["system.cpu"]),
     fetchFirstAvailableChart("RAM", ["system.ram"]),
     fetchFirstAvailableChart("root disk", ["disk_space./", "disk.space"]),
@@ -226,6 +271,8 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
       ...discoveredNvidia.temperature,
     ]),
     getNvidiaSmi(),
+    getHostCpuPercent(),
+    getHostRam(),
   ]);
 
   const idle = firstNumber(cpuPoint, ["idle"]);
@@ -261,11 +308,11 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     mib === null ? null : mib / 1024;
 
   return {
-    cpuPercent: cpuBusy === null ? null : Number(cpuBusy.toFixed(1)),
+    cpuPercent: hostCpuPercent === null ? (cpuBusy === null ? null : Number(cpuBusy.toFixed(1))) : Number(hostCpuPercent.toFixed(1)),
     ram: {
-      usedMb: ramUsed === null ? null : Number(ramUsed.toFixed(0)),
-      totalMb: ramTotal === null ? null : Number(ramTotal.toFixed(0)),
-      percent: ramPercent === null ? null : Number(ramPercent.toFixed(1)),
+      usedMb: hostRam ? Number(hostRam.usedMb.toFixed(0)) : (ramUsed === null ? null : Number(ramUsed.toFixed(0))),
+      totalMb: hostRam ? Number(hostRam.totalMb.toFixed(0)) : (ramTotal === null ? null : Number(ramTotal.toFixed(0))),
+      percent: hostRam ? Number(hostRam.percent.toFixed(1)) : (ramPercent === null ? null : Number(ramPercent.toFixed(1))),
     },
     disk: {
       usedGb: toGb(diskUsed) === null ? null : Number(toGb(diskUsed)!.toFixed(1)),

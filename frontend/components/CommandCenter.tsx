@@ -15,7 +15,7 @@ import { UpdateButton } from "./UpdateButton";
 type ContainersResponse = { containers: Container[] };
 type AppsResponse = { apps: AppTile[] };
 type LogsResponse = { name: string; logs: string };
-type HistoryPoint = { time: string; gpu: number | null; vram: number | null; temperature: number | null; cpu: number | null };
+type HistoryPoint = { time: string; gpu: number | null; vram: number | null; temperature: number | null; cpu: number | null; ram: number | null };
 type NetworkPoint = { time: string; down: number | null; up: number | null };
 
 function formatBytes(value: number | null | undefined): string {
@@ -40,8 +40,9 @@ function value(value: number | null | undefined, suffix = ""): string {
   return value === null || value === undefined || Number.isNaN(value) ? "—" : `${value}${suffix}`;
 }
 
-function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPoint[]; label: string; dataKey: "gpu" | "vram" | "temperature" | "cpu"; unit: string; color: string }) {
-  const height = dataKey === "cpu" ? 98 : dataKey === "temperature" ? 62 : 78;
+function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPoint[]; label: string; dataKey: "gpu" | "vram" | "temperature" | "cpu" | "ram"; unit: string; color: string }) {
+  const height = dataKey === "cpu" || dataKey === "ram" ? 74 : dataKey === "temperature" ? 62 : 78;
+  const percentageMetric = dataKey === "gpu" || dataKey === "cpu" || dataKey === "ram";
   return (
     <div className="telemetry-chart">
       <div className="chart-heading"><span>{label}</span><strong style={{ color }}>{data.at(-1)?.[dataKey] ?? "—"}{unit}</strong></div>
@@ -49,7 +50,7 @@ function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPo
         <LineChart data={data} margin={{ top: 8, right: 2, left: -22, bottom: 0 }}>
           <CartesianGrid stroke="#202933" strokeDasharray="2 3" vertical={false} />
           <XAxis dataKey="time" minTickGap={44} tick={{ fill: "#6d7885", fontSize: 10 }} axisLine={false} tickLine={false} />
-          <YAxis width={30} tick={{ fill: "#6d7885", fontSize: 10 }} axisLine={false} tickLine={false} />
+          <YAxis width={30} domain={percentageMetric ? [0, 100] : ["auto", "auto"]} tick={{ fill: "#6d7885", fontSize: 10 }} axisLine={false} tickLine={false} />
           <Tooltip contentStyle={{ background: "#11171d", border: "1px solid #29333e", borderRadius: 6 }} labelStyle={{ color: "#cfd6df" }} />
           <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={2.25} dot={false} isAnimationActive={false} />
         </LineChart>
@@ -91,7 +92,7 @@ export function CommandCenter() {
     2_000,
     (next) => {
       const now = new Date();
-      const point: HistoryPoint = { time: now.toLocaleTimeString([], { minute: "2-digit", second: "2-digit" }), gpu: next.gpu.utilizationPercent, vram: next.gpu.memoryUsedMb, temperature: next.gpu.temperatureC, cpu: next.cpuPercent };
+      const point: HistoryPoint = { time: now.toLocaleTimeString([], { minute: "2-digit", second: "2-digit" }), gpu: next.gpu.utilizationPercent, vram: next.gpu.memoryUsedMb, temperature: next.gpu.temperatureC, cpu: next.cpuPercent, ram: next.ram.percent };
       setHistory((current) => [...current.slice(-44), point]);
     },
   );
@@ -180,7 +181,7 @@ export function CommandCenter() {
             </div>
           </section>
 
-          <section className="cpu-panel"><TelemetryChart data={history} label="CPU utilization" dataKey="cpu" unit="%" color="#facc15" /><div className="cpu-extra"><span>RAM</span><strong>{formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} / {formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}</strong><span>{value(system?.ram.percent, "%")}</span></div></section>
+          <section className="cpu-panel"><TelemetryChart data={history} label="CPU utilization" dataKey="cpu" unit="%" color="#facc15" /><TelemetryChart data={history} label="RAM utilization" dataKey="ram" unit="%" color="#60a5fa" /><div className="cpu-extra"><span>RAM</span><strong>{formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} / {formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}</strong><span>{value(system?.ram.percent, "%")}</span></div></section>
           <section className="services-panel"><div className="panel-title"><div><h2>Service health</h2><span>{running.length} healthy containers</span></div><ChartLineUp size={22} weight="light" /></div><div className="service-list">{containers.slice(0, 5).map((container) => <button key={container.id} onClick={() => setSelectedContainer(container.name)}><span><i className={container.state === "running" ? "status-dot" : "status-off"} />{container.name}</span><small>{container.state}</small></button>)}</div></section>
         </div>
 
