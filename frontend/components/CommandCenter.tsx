@@ -7,7 +7,7 @@ import {
   ActivityIcon, ChartLineUp, Clock, Copy, Cube, Database, DownloadSimple,
   HardDrives, Lightning, List, Monitor, Network, SquaresFour, Terminal, WarningCircle, X,
 } from "@phosphor-icons/react";
-import { CartesianGrid, Line, LineChart, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { CartesianGrid, Line, LineChart, PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiGet } from "../lib/api";
 import type { AppTile, Container, DiagnosticsReport, DownloadsResponse, HostOverview, PiholeStats, SystemMetrics } from "../lib/types";
 import { usePolling } from "../lib/usePolling";
@@ -93,6 +93,7 @@ function UsageGauge({ label, percent, detail, tone }: { label: string; percent: 
       <div className="gauge-visual" aria-hidden="true">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart cx="50%" cy="73%" innerRadius="70%" outerRadius="100%" startAngle={180} endAngle={0} data={[{ value: safePercent, fill: color }]} barSize={12}>
+            <PolarAngleAxis type="number" domain={[0, 100]} tick={false} axisLine={false} />
             <RadialBar dataKey="value" background={{ fill: "#222b35" }} cornerRadius={8} isAnimationActive={false} />
           </RadialBarChart>
         </ResponsiveContainer>
@@ -201,13 +202,13 @@ export function CommandCenter() {
       <section className="workspace" id="now">
         <header className="topbar">
           <div><h1>Dayyan&apos;s HomeLab</h1></div>
-          <div className="top-status"><span className="connection-mark" aria-hidden="true" /> <span>Host connected</span><span className="top-separator" /> <span>Updated {metricsFreshness}</span></div>
+          <div className="top-status"><span className="connection-state online">Online</span><span className="top-separator" /> <span>Updated {metricsFreshness}</span></div>
         </header>
 
         <section className="status-strip" id="host-status">
           <div className="status-stat"><Clock size={23} weight="light" /><div><span>Uptime</span><strong>{duration(host?.uptimeSeconds)}</strong><small>On since {easternDateTime(host?.startedAt)}</small></div></div>
           <div className="status-stat"><Network size={23} weight="light" /><div><span>Network</span><strong>↓ {formatBytes(host?.network.receivedBytesPerSecond)}/s <em>↑ {formatBytes(host?.network.sentBytesPerSecond)}/s</em></strong><small>Live host traffic</small></div></div>
-          <div className="status-stat" id="storage"><Database size={23} weight="light" /><div><span>Storage</span><strong>{host?.storage[0] ? `${formatBytes(host.storage[0].usedBytes)} / ${formatBytes(host.storage[0].totalBytes)}` : "—"}</strong><small>{host?.storage[0]?.mount ?? "No mount data"}</small><i className="stat-meter storage-meter"><b style={{ width: `${host?.storage[0]?.percent ?? 0}%` }} /></i></div></div>
+          <div className="status-stat" id="storage"><Database size={23} weight="light" /><div><span>Storage</span><strong>{host?.storage[0] ? `${formatBytes(host.storage[0].usedBytes)} / ${formatBytes(host.storage[0].totalBytes)}` : "—"}</strong><small>{host?.storage[0] ? host.storage[0].mount === "/" ? "System volume" : host.storage[0].mount : "No mount data"}</small><i className="stat-meter storage-meter"><b style={{ width: `${host?.storage[0]?.percent ?? 0}%` }} /></i></div></div>
           <div className="status-stat"><ActivityIcon size={23} weight="light" /><div><span>System load</span><strong>CPU {value(system?.cpuPercent, "%")} <em>RAM {value(system?.ram.percent, "%")}</em></strong><small>{host?.loadAverage[0]?.toFixed(2) ?? "—"} load average</small></div></div>
         </section>
 
@@ -232,7 +233,7 @@ export function CommandCenter() {
             <div className="container-table" role="table">
               <div className="container-head" role="row"><span>Status</span><span>Name</span><span>CPU</span><span>RAM</span><span>Actions</span></div>
               {visibleContainers.map((container) => <div className={`container-row ${activeName === container.name ? "selected" : ""}`} key={container.id} role="row">
-                <button className="container-name" onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><i className={container.state === "running" ? "container-state running" : "container-state stopped"}>{container.state === "running" ? "On" : "Off"}</i><span>{container.name}<small>{container.image}</small></span></button>
+                <button className="container-name" onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><i className={container.state === "running" ? "container-state running" : "container-state stopped"} aria-label={container.state === "running" ? "Running" : "Stopped"} /><span>{container.name}<small>{container.image}</small></span></button>
                 <span>{value(container.cpuPercent, "%")}</span><span>{formatBytes(container.memoryUsageBytes)}</span>
                 <div className="row-actions"><button aria-label={`View ${container.name} logs`} onClick={() => { setSelectedContainer(container.name); setLogModal(container); }}><List size={16} />Logs</button><button aria-label={`Open ${container.name} terminal command`} onClick={() => void copyCommand(container)}><Terminal size={16} />Terminal</button></div>
               </div>)}

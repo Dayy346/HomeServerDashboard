@@ -14,7 +14,7 @@ Date: 2026-09-15
 - Their warning colors change only at higher utilization, avoiding the repeated green “everything is fine” treatment from the previous screen.
 - The compact storage summary again includes a fill bar, while the detailed mount bars remain in the storage section.
 - On the narrow in-app preview, the two gauges stack cleanly without overflow; the existing 700px breakpoint preserves a single-column phone layout.
-- The header, sidebar, Pi-hole, and container states no longer rely on repeated glowing green dots. Connection and service state use quiet neutral/purple labels instead.
+- The header uses a single compact Online state; container rows use only one small green/red status circle, so running versus stopped stays obvious without filling the dashboard with badges.
 
 ## Result
 

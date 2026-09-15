@@ -60,11 +60,12 @@
 @media (max-width:700px) { .container-head,.container-row { min-width:0; grid-template-columns:14px minmax(0,1fr) 64px; }.container-head span:nth-child(3),.container-row>span { display:none; }.row-actions { display:none; }.container-name { min-width:0; }.log-dialog { width:calc(100vw - 20px); }.log-dialog .log-output { min-height:300px; font-size:9px; }.quick-links { grid-template-columns:repeat(3,minmax(0,1fr)); }.links-card .quick-links { grid-template-columns:repeat(3,minmax(0,1fr)); } }
 
 /* Calm connection states and two readable capacity gauges replace repeated green dots and CPU/RAM traces. */
-.connection-mark { display:inline-block; width:8px; height:8px; border:2px solid #8b5cf6; border-radius:50%; box-shadow:0 0 0 3px rgba(139,92,246,.14); }
+.connection-mark { display:inline-block; width:8px; height:8px; border:2px solid #4ade80; border-radius:50%; box-shadow:0 0 0 3px rgba(74,222,128,.12); }
 .sidebar-foot .connection-mark { grid-column:1; grid-row:1; align-self:center; }
-.container-name > .container-state { display:inline-flex; width:auto; height:auto; grid-column:1; align-items:center; justify-content:center; border:1px solid #3c4652; border-radius:3px; padding:2px 3px; background:#151c23; color:#aeb9c4; font-size:8px; font-style:normal; line-height:1; box-shadow:none; }
-.container-name > .container-state.running { border-color:#394458; color:#b7a0ff; background:#17152a; }
-.container-name > .container-state.stopped { border-color:#5e4751; color:#e5a3b8; background:#25151b; }
+.connection-state { display:inline-flex; align-items:center; gap:5px; padding:4px 7px; border:1px solid #315341; border-radius:999px; color:#b9eac8; background:#102219; font-size:10px; letter-spacing:.03em; text-transform:uppercase; }.connection-state::before { width:6px; height:6px; border-radius:50%; background:#4ade80; box-shadow:0 0 8px rgba(74,222,128,.45); content:""; }
+.container-name > .container-state { display:block; width:8px; height:8px; grid-column:1; border:0; border-radius:50%; padding:0; font-size:0; font-style:normal; line-height:0; box-shadow:none; }
+.container-name > .container-state.running { background:#4ade80; box-shadow:0 0 8px rgba(74,222,128,.35); }
+.container-name > .container-state.stopped { background:#fb7185; box-shadow:0 0 8px rgba(251,113,133,.3); }
 .service-state { padding:3px 6px; border:1px solid #414b57; border-radius:999px; color:#b7c1cc; font-size:10px; letter-spacing:.04em; text-transform:uppercase; }
 .healthy-state { padding:20px 0; color:#9ba8b5; }
 
