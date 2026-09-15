@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=REPLACE_WITH_YOUR_USER
-SupplementaryGroups=docker
+SupplementaryGroups=docker systemd-journal
 WorkingDirectory=/opt/HomeServerDashboard/backend
 EnvironmentFile=/opt/HomeServerDashboard/.env
 ExecStart=/usr/bin/node dist/index.js

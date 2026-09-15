@@ -39,6 +39,9 @@ async function storage(): Promise<StorageMount[]> {
       percent: Number(percent.replace("%", "")),
     }))
     .filter((mount) => Number.isFinite(mount.totalBytes) && mount.totalBytes > 0)
+    // Runtime filesystems make a storage dashboard noisy and are not useful
+    // when deciding whether a disk is filling up.
+    .filter((mount) => !["/dev", "/proc", "/sys", "/run", "/tmp"].some((prefix) => mount.mount === prefix || mount.mount.startsWith(`${prefix}/`)))
     .sort((a, b) => b.totalBytes - a.totalBytes)
     .slice(0, 6);
 }

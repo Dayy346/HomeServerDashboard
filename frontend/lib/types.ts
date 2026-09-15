@@ -89,6 +89,17 @@ export type AppTile = {
   url: string;
 };
 
+export type DiagnosticsReport = {
+  generatedAt: string;
+  uptimeSeconds: number;
+  memory: { availableMb: number | null; totalMb: number | null; swapFreeMb: number | null };
+  pressure: string;
+  recentReboots: string;
+  previousBootEvents: string;
+  currentKernelEvents: string;
+  note: string;
+};
+
 
 export type UpdateResult = {
   ok: boolean;

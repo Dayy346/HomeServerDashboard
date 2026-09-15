@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getAllDownloads } from "../services/downloads.js";
+import { getAllDownloads, getDownloadLogs } from "../services/downloads.js";
 
 
 export const downloadsRouter = Router();
@@ -12,4 +12,8 @@ downloadsRouter.get("/", async (_req, res, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+downloadsRouter.get("/logs", async (_req, res, next) => {
+  try { res.json({ logs: await getDownloadLogs() }); } catch (error) { next(error); }
 });

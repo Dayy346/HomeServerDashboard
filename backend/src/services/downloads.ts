@@ -1,5 +1,5 @@
 import { settle } from "../lib/result.js";
-import { getQbittorrentDownloads } from "./qbittorrent.js";
+import { getQbittorrentDownloads, getQbittorrentLog } from "./qbittorrent.js";
 import { getRadarrDownloads, getSonarrDownloads } from "./arr.js";
 
 
@@ -44,4 +44,8 @@ export async function getAllDownloads(): Promise<DownloadsResponse> {
 
   items.sort((a, b) => a.name.localeCompare(b.name));
   return { items, errors };
+}
+
+export async function getDownloadLogs(): Promise<string> {
+  return getQbittorrentLog();
 }

@@ -112,3 +112,16 @@ export async function getQbittorrentDownloads(): Promise<DownloadItem[]> {
       downloadedBytes: t.downloaded,
     }));
 }
+
+type QbittorrentLog = { timestamp?: number; message?: string; type?: number };
+
+export async function getQbittorrentLog(): Promise<string> {
+  if (!env.qbittorrentPass) return "qBittorrent credentials are not configured.";
+  const base = stripTrailingSlash(env.qbittorrentUrl);
+  const request = async () => fetchJson<QbittorrentLog[]>(`${base}/api/v2/log/main?last_known_id=-1`, {
+    headers: { Cookie: await login() },
+  });
+  let entries: QbittorrentLog[];
+  try { entries = await request(); } catch { clearSession(); entries = await request(); }
+  return entries.slice(-80).map((entry) => `${entry.timestamp ? new Date(entry.timestamp * 1000).toISOString() : ""} ${entry.message ?? ""}`.trim()).join("\n") || "No qBittorrent log entries yet.";
+}
