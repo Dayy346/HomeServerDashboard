@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { ThinkingOrb } from "thinking-orbs";
 import {
@@ -97,7 +97,9 @@ export function CommandCenter() {
   const [showAllContainers, setShowAllContainers] = useState(false);
   const [showDownloadLogs, setShowDownloadLogs] = useState(false);
   const [logModal, setLogModal] = useState<Container | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [copied, setCopied] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const { data: system, error: systemError } = usePolling<SystemMetrics>(
     (signal) => apiGet<SystemMetrics>("/api/system", signal),
     2_000,
@@ -218,7 +220,7 @@ export function CommandCenter() {
         </section>
 
         <section className="log-panel log-panel-bottom" aria-live="polite">
-          <div className="log-toolbar"><div><h2>Live container log</h2><span>{selected?.name ?? "Select a container"}</span></div><div><button className="quiet-button" onClick={() => activeName && setSelectedContainer(activeName)}><Monitor size={16} />Live</button><button className="quiet-button" onClick={() => selected && void copyCommand(selected)} disabled={selected === null}><Terminal size={16} />Terminal</button></div></div>
+          <div className="log-toolbar"><div><h2>Live container log</h2><span>{selected?.name ?? "Select a container"}</span></div><div><button className="quiet-button" onClick={() => activeName && setSelectedContainer(activeName)}><Monitor size={16} />Live</button><button className="quiet-button" onClick={() => selected && void copyCommand(selected)} disabled={mounted ? selected === null : undefined}><Terminal size={16} />Terminal</button></div></div>
           {logsError ? <p className="panel-error">Log stream unavailable: {logsError}</p> : <pre className="log-output">{logsData?.logs || "Waiting for container output…"}</pre>}
         </section>
 
