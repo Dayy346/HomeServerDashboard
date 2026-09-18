@@ -135,7 +135,7 @@ export function CommandCenter() {
   const [showDownloadLogs, setShowDownloadLogs] = useState(false);
   const [logModal, setLogModal] = useState<Container | null>(null);
   const [copied, setCopied] = useState(false);
-  const [expandedGauge, setExpandedGauge] = useState<"cpu" | "ram" | null>(null);
+  const [expandedGauges, setExpandedGauges] = useState<Record<"cpu" | "ram", boolean>>({ cpu: false, ram: false });
   const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const { data: system, error: systemError } = usePolling<SystemMetrics>(
     (signal) => apiGet<SystemMetrics>("/api/system", signal),
@@ -156,7 +156,7 @@ export function CommandCenter() {
   );
   const { data: containerData, error: containersError } = usePolling<ContainersResponse>((signal) => apiGet<ContainersResponse>("/api/containers", signal), 4_000);
   const { data: pihole } = usePolling<PiholeStats>((signal) => apiGet<PiholeStats>("/api/pihole", signal), 30_000);
-  const { data: processes } = usePolling<ProcessConsumers>((signal) => apiGet<ProcessConsumers>("/api/processes", signal), expandedGauge ? 4_000 : 60_000);
+  const { data: processes } = usePolling<ProcessConsumers>((signal) => apiGet<ProcessConsumers>("/api/processes", signal), expandedGauges.cpu || expandedGauges.ram ? 4_000 : 60_000);
   const { data: downloads } = usePolling<DownloadsResponse>((signal) => apiGet<DownloadsResponse>("/api/downloads", signal), 15_000);
   const { data: apps } = usePolling<AppsResponse>((signal) => apiGet<AppsResponse>("/api/apps", signal), 60_000);
   const { data: diagnostics } = usePolling<DiagnosticsReport>((signal) => apiGet<DiagnosticsReport>("/api/diagnostics", signal), 60_000);
@@ -245,7 +245,7 @@ export function CommandCenter() {
           </section>
 
           <section className="storage-panel"><div className="panel-title"><div><h2>Storage mounts</h2><span>{host?.storage.length ?? 0} persistent disks</span></div><HardDrives size={21} weight="light" /></div>{host?.storage.length ? <div className="mount-grid">{host.storage.map((mount) => <div className="mount-card" key={mount.mount}><div><HardDrives size={19} weight="duotone" /><span>{mount.mount === "/" ? "System" : mount.mount.split("/").filter(Boolean).at(-1)}</span><strong>{mount.percent}%</strong></div><small>{formatBytes(mount.usedBytes)} of {formatBytes(mount.totalBytes)}</small><i><b style={{ width: `${mount.percent}%` }} /></i></div>)}</div> : <p>Mount details appear when the dashboard runs on Linux.</p>}</section>
-          <section className="cpu-panel capacity-panel"><div className="panel-title"><div><h2>Host capacity</h2><span>Select a gauge for its top consumers</span></div><ActivityIcon size={22} weight="light" /></div><div className="gauge-grid"><UsageGauge label="CPU usage" percent={system?.cpuPercent} detail={`${host?.loadAverage[0]?.toFixed(2) ?? "—"} load average`} tone="cpu" expanded={expandedGauge === "cpu"} onToggle={() => setExpandedGauge((current) => current === "cpu" ? null : "cpu")} processes={processes ?? undefined} /><UsageGauge label="Memory" percent={system?.ram.percent} detail={`${formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} of ${formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}`} tone="ram" expanded={expandedGauge === "ram"} onToggle={() => setExpandedGauge((current) => current === "ram" ? null : "ram")} processes={processes ?? undefined} /></div></section>
+          <section className="cpu-panel capacity-panel"><div className="panel-title"><div><h2>Host capacity</h2><span>Select a gauge for its top consumers</span></div><ActivityIcon size={22} weight="light" /></div><div className="gauge-grid"><UsageGauge label="CPU usage" percent={system?.cpuPercent} detail={`${host?.loadAverage[0]?.toFixed(2) ?? "—"} load average`} tone="cpu" expanded={expandedGauges.cpu} onToggle={() => setExpandedGauges((current) => ({ ...current, cpu: !current.cpu }))} processes={processes ?? undefined} /><UsageGauge label="Memory" percent={system?.ram.percent} detail={`${formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} of ${formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}`} tone="ram" expanded={expandedGauges.ram} onToggle={() => setExpandedGauges((current) => ({ ...current, ram: !current.ram }))} processes={processes ?? undefined} /></div></section>
           <section className="services-panel"><div className="panel-title"><div><h2>Needs attention</h2><span>{attentionContainers.length ? `${attentionContainers.length} container${attentionContainers.length === 1 ? "" : "s"} stopped` : "No stopped containers"}</span></div><ChartLineUp size={22} weight="light" /></div><div className="service-list">{attentionContainers.length ? attentionContainers.map((container) => <button key={container.id} onClick={() => setSelectedContainer(container.name)}><span><i className="status-off" />{container.name}</span><small>{container.status}</small></button>) : <p className="healthy-state">No action needed — every container is running.</p>}</div></section>
         </div>
 

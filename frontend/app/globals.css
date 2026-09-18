@@ -100,3 +100,14 @@
 @media (max-width:700px) { .storage-panel { padding:13px; }.usage-gauge.expanded { min-height:330px; }.pihole-card { min-height:0; }.updates-card { margin-top:12px; } }
 
 @media (min-width:900px) { .gpu-panel { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 14px; }.gpu-panel>.panel-title,.gpu-panel>.panel-error,.gpu-panel>.gpu-details { grid-column:1/-1; }.gpu-panel .telemetry-chart { min-width:0; padding:8px 0 1px; }.gpu-panel .telemetry-chart .chart-heading strong { font-size:17px; }.gpu-panel .gpu-details { padding-top:8px; } }
+
+/* Independent capacity cards: each one grows only when its own detail list is open. */
+.gauge-grid { align-items:start; }
+.usage-gauge.expanded { display:grid; grid-template-rows:128px auto auto; min-height:0; padding:6px 10px 10px; overflow:visible; }
+.usage-gauge.expanded .gauge-visual { position:relative; inset:auto; height:128px; }
+.usage-gauge.expanded .gauge-copy { position:relative; right:auto; bottom:auto; left:auto; min-height:50px; margin-top:-23px; padding:0; }
+.usage-gauge.expanded .consumer-breakdown { position:relative; right:auto; bottom:auto; left:auto; min-width:0; padding-top:8px; }
+.consumer-breakdown li { min-height:25px; }.consumer-breakdown li>span { line-height:1.25; }.consumer-breakdown li small { line-height:1.25; }.consumer-breakdown li strong { flex:0 0 auto; }
+
+/* GPU trends are deliberately stacked: timeline labels stay readable at any desktop width. */
+@media (min-width:900px) { .gpu-panel { display:block; }.gpu-panel .telemetry-chart { padding:9px 0 2px; }.gpu-panel .telemetry-chart .chart-heading strong { font-size:20px; } }
