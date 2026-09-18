@@ -61,6 +61,19 @@ export type PiholeStats = {
   blockedPercent: number | null;
   uniqueClients: number | null;
   domainsBeingBlocked: number | null;
+  topBlockedDomains: Array<{ domain: string; count: number }>;
+};
+
+export type ProcessConsumer = {
+  pid: number;
+  name: string;
+  cpuPercent: number;
+  memoryMb: number;
+};
+
+export type ProcessConsumers = {
+  cpu: ProcessConsumer[];
+  memory: ProcessConsumer[];
 };
 
 

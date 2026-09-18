@@ -81,3 +81,22 @@
 .status-stat .storage-meter { width:100%; margin-top:5px; }.storage-meter b { min-width:0; background:linear-gradient(90deg,#8b5cf6,#c4a8ff); }
 
 @media (max-width:700px) { .capacity-panel { min-height:0; }.gauge-grid { grid-template-columns:1fr; }.usage-gauge { min-height:154px; }.top-status .connection-mark { display:none; } }
+
+/* Fold-first desktop layout: primary compute and disk state arrives before supporting controls. */
+.storage-panel { min-height:214px; padding:14px 17px 12px; border:1px solid var(--line); background:var(--surface); }
+.storage-panel>p { color:var(--muted); font-size:12px; }
+.dashboard-grid .storage-panel { grid-column:auto; grid-row:auto; }
+.dashboard-grid .services-panel { grid-column:auto; grid-row:auto; }
+.dashboard-grid { gap:10px; }
+.gpu-panel { padding:12px 15px 9px; }.telemetry-chart { padding:8px 0 1px; }.gpu-details { padding-top:9px; }.gpu-details div { padding:0 10px; }
+.capacity-panel { min-height:214px; padding:12px 15px; }.capacity-panel .panel-title { padding-bottom:9px; }.gauge-grid { gap:8px; padding-top:9px; }.usage-gauge { min-height:150px; }
+.gauge-copy { width:100%; border:0; background:transparent; cursor:pointer; font:inherit; }.gauge-copy:hover span,.gauge-copy:focus-visible span { color:#eef3f7; }.gauge-copy:focus-visible { outline:2px solid #8b5cf6; outline-offset:-3px; }.gauge-copy small { display:inline-flex; align-items:center; gap:3px; }
+.usage-gauge.expanded { min-height:332px; }.usage-gauge.expanded .gauge-visual { inset:6px 10px auto; height:120px; }.usage-gauge.expanded .gauge-copy { top:100px; bottom:auto; }.consumer-breakdown { position:absolute; right:10px; bottom:10px; left:10px; border-top:1px solid #27323c; padding-top:8px; }.consumer-breakdown>span { color:#8290a0; font-size:9px; letter-spacing:.07em; text-transform:uppercase; }.consumer-breakdown ol,.blocked-domains ol { display:grid; gap:0; margin:5px 0 0; padding:0; list-style:none; }.consumer-breakdown li,.blocked-domains li { display:flex; align-items:center; justify-content:space-between; gap:8px; min-width:0; padding:5px 0; border-bottom:1px solid #1f2932; }.consumer-breakdown li>span { min-width:0; overflow:hidden; color:#d7e0e7; font-size:10px; text-overflow:ellipsis; white-space:nowrap; }.consumer-breakdown li small { display:inline; margin-left:5px; color:#697788; font-size:9px; }.consumer-breakdown li strong { color:#b7a0ff; font-size:10px; }.consumer-breakdown p { margin:8px 0 0; color:#7c8997; font-size:10px; }
+
+.pihole-card { min-height:238px; }.pihole-card .operation-number { margin-top:10px; }.pihole-card>p { margin:4px 0 9px; }.blocked-domains { border-top:1px solid var(--line); padding-top:7px; }.blocked-domains>span { color:#8996a5; font-size:10px; text-transform:uppercase; letter-spacing:.06em; }.blocked-domains li { padding:3px 0; }.blocked-domains li span { min-width:0; overflow:hidden; color:#cdd7df; font:10px "Courier New",monospace; text-overflow:ellipsis; white-space:nowrap; }.blocked-domains li strong { color:#79dca0; font-size:10px; }.blocked-domains p { margin:7px 0 0; color:#778493; font-size:10px; }
+.operations-grid .pihole-card,.operations-grid .download-card,.operations-grid .network-card { grid-column:span 4; }.operations-grid .links-card { grid-column:1 / -1; }.updates-card { grid-column:auto; grid-row:auto; width:100%; min-height:0; margin-top:12px; }.updates-card>p { max-width:68ch; }
+
+@media (min-width:1321px) { .workspace { padding-right:18px; padding-bottom:28px; }.topbar { min-height:62px; }.status-strip { margin-top:10px; }.status-stat { padding:11px 14px; }.status-stat strong { font-size:14px; }.dashboard-grid { margin-top:10px; }.fleet-panel { padding:12px 11px 8px; }.container-row { min-height:49px; }.container-head { min-height:31px; }.storage-panel { min-height:196px; }.mount-grid { gap:7px; margin-top:9px; }.mount-card { padding:9px; }.mount-card small { margin:5px 0; }.operations-grid { margin-top:10px; } }
+@media (max-width:700px) { .storage-panel { padding:13px; }.usage-gauge.expanded { min-height:330px; }.pihole-card { min-height:0; }.updates-card { margin-top:12px; } }
+
+@media (min-width:900px) { .gpu-panel { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0 14px; }.gpu-panel>.panel-title,.gpu-panel>.panel-error,.gpu-panel>.gpu-details { grid-column:1/-1; }.gpu-panel .telemetry-chart { min-width:0; padding:8px 0 1px; }.gpu-panel .telemetry-chart .chart-heading strong { font-size:17px; }.gpu-panel .gpu-details { padding-top:8px; } }

@@ -8,6 +8,7 @@ import { containersRouter } from "./routes/containers.js";
 import { downloadsRouter } from "./routes/downloads.js";
 import { diagnosticsRouter } from "./routes/diagnostics.js";
 import { piholeRouter } from "./routes/pihole.js";
+import { processesRouter } from "./routes/processes.js";
 import { hostRouter } from "./routes/host.js";
 import { systemRouter } from "./routes/system.js";
 import { updatesRouter } from "./routes/updates.js";
@@ -49,6 +50,7 @@ app.get("/api/health", (_req, res) => {
 
 app.use("/api/system", systemRouter);
 app.use("/api/pihole", piholeRouter);
+app.use("/api/processes", processesRouter);
 app.use("/api/downloads", downloadsRouter);
 app.use("/api/diagnostics", diagnosticsRouter);
 app.use("/api/apps", appsRouter);

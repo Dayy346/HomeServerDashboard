@@ -5,11 +5,11 @@ import Image from "next/image";
 import { ThinkingOrb } from "thinking-orbs";
 import {
   ActivityIcon, ChartLineUp, Clock, Copy, Cube, Database, DownloadSimple,
-  HardDrives, Lightning, List, Monitor, Network, SquaresFour, Terminal, WarningCircle, X,
+  CaretDown, HardDrives, Lightning, List, Monitor, Network, SquaresFour, Terminal, WarningCircle, X,
 } from "@phosphor-icons/react";
 import { CartesianGrid, Line, LineChart, PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiGet } from "../lib/api";
-import type { AppTile, Container, DiagnosticsReport, DownloadsResponse, HostOverview, PiholeStats, SystemMetrics } from "../lib/types";
+import type { AppTile, Container, DiagnosticsReport, DownloadsResponse, HostOverview, PiholeStats, ProcessConsumers, SystemMetrics } from "../lib/types";
 import { usePolling } from "../lib/usePolling";
 import { UpdateButton } from "./UpdateButton";
 
@@ -82,14 +82,14 @@ function TelemetryChart({ data, label, dataKey, unit, color }: { data: HistoryPo
   );
 }
 
-function UsageGauge({ label, percent, detail, tone }: { label: string; percent: number | null | undefined; detail: string; tone: "cpu" | "ram" }) {
+function UsageGauge({ label, percent, detail, tone, expanded, onToggle, processes }: { label: string; percent: number | null | undefined; detail: string; tone: "cpu" | "ram"; expanded: boolean; onToggle: () => void; processes: ProcessConsumers | undefined }) {
   const safePercent = Math.min(100, Math.max(0, percent ?? 0));
   const color = tone === "cpu"
     ? safePercent > 80 ? "#fb7185" : safePercent > 55 ? "#fbbf24" : "#a78bfa"
     : safePercent > 85 ? "#fb7185" : safePercent > 65 ? "#fb923c" : "#38bdf8";
 
   return (
-    <div className={`usage-gauge ${tone}`}>
+    <section className={`usage-gauge ${tone} ${expanded ? "expanded" : ""}`}>
       <div className="gauge-visual" aria-hidden="true">
         <ResponsiveContainer width="100%" height="100%">
           <RadialBarChart cx="50%" cy="73%" innerRadius="70%" outerRadius="100%" startAngle={180} endAngle={0} data={[{ value: safePercent, fill: color }]} barSize={12}>
@@ -98,8 +98,9 @@ function UsageGauge({ label, percent, detail, tone }: { label: string; percent: 
           </RadialBarChart>
         </ResponsiveContainer>
       </div>
-      <div className="gauge-copy"><span>{label}</span><strong>{percent === null || percent === undefined ? "—" : `${Math.round(percent)}%`}</strong><small>{detail}</small></div>
-    </div>
+      <button className="gauge-copy" type="button" onClick={onToggle} aria-expanded={expanded} aria-controls={`${tone}-consumers`}><span>{label}</span><strong>{percent === null || percent === undefined ? "—" : `${Math.round(percent)}%`}</strong><small>{detail} <CaretDown size={12} weight="bold" /></small></button>
+      {expanded ? <div className="consumer-breakdown" id={`${tone}-consumers`}><span>Top {tone === "cpu" ? "CPU" : "memory"} consumers</span>{processes?.[tone === "cpu" ? "cpu" : "memory"]?.length ? <ol>{processes[tone === "cpu" ? "cpu" : "memory"].map((process) => <li key={`${tone}-${process.pid}`}><span title={`${process.name} (PID ${process.pid})`}>{process.name}<small>PID {process.pid}</small></span><strong>{tone === "cpu" ? `${process.cpuPercent.toFixed(1)}%` : `${process.memoryMb.toFixed(0)} MB`}</strong></li>)}</ol> : <p>Reading live processes…</p>}</div> : null}
+    </section>
   );
 }
 
@@ -134,6 +135,7 @@ export function CommandCenter() {
   const [showDownloadLogs, setShowDownloadLogs] = useState(false);
   const [logModal, setLogModal] = useState<Container | null>(null);
   const [copied, setCopied] = useState(false);
+  const [expandedGauge, setExpandedGauge] = useState<"cpu" | "ram" | null>(null);
   const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   const { data: system, error: systemError } = usePolling<SystemMetrics>(
     (signal) => apiGet<SystemMetrics>("/api/system", signal),
@@ -154,6 +156,7 @@ export function CommandCenter() {
   );
   const { data: containerData, error: containersError } = usePolling<ContainersResponse>((signal) => apiGet<ContainersResponse>("/api/containers", signal), 4_000);
   const { data: pihole } = usePolling<PiholeStats>((signal) => apiGet<PiholeStats>("/api/pihole", signal), 30_000);
+  const { data: processes } = usePolling<ProcessConsumers>((signal) => apiGet<ProcessConsumers>("/api/processes", signal), expandedGauge ? 4_000 : 60_000);
   const { data: downloads } = usePolling<DownloadsResponse>((signal) => apiGet<DownloadsResponse>("/api/downloads", signal), 15_000);
   const { data: apps } = usePolling<AppsResponse>((signal) => apiGet<AppsResponse>("/api/apps", signal), 60_000);
   const { data: diagnostics } = usePolling<DiagnosticsReport>((signal) => apiGet<DiagnosticsReport>("/api/diagnostics", signal), 60_000);
@@ -241,17 +244,16 @@ export function CommandCenter() {
             </div>
           </section>
 
-          <section className="cpu-panel capacity-panel"><div className="panel-title"><div><h2>Host capacity</h2><span>Current system usage</span></div><ActivityIcon size={22} weight="light" /></div><div className="gauge-grid"><UsageGauge label="CPU usage" percent={system?.cpuPercent} detail={`${host?.loadAverage[0]?.toFixed(2) ?? "—"} load average`} tone="cpu" /><UsageGauge label="Memory" percent={system?.ram.percent} detail={`${formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} of ${formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}`} tone="ram" /></div></section>
+          <section className="storage-panel"><div className="panel-title"><div><h2>Storage mounts</h2><span>{host?.storage.length ?? 0} persistent disks</span></div><HardDrives size={21} weight="light" /></div>{host?.storage.length ? <div className="mount-grid">{host.storage.map((mount) => <div className="mount-card" key={mount.mount}><div><HardDrives size={19} weight="duotone" /><span>{mount.mount === "/" ? "System" : mount.mount.split("/").filter(Boolean).at(-1)}</span><strong>{mount.percent}%</strong></div><small>{formatBytes(mount.usedBytes)} of {formatBytes(mount.totalBytes)}</small><i><b style={{ width: `${mount.percent}%` }} /></i></div>)}</div> : <p>Mount details appear when the dashboard runs on Linux.</p>}</section>
+          <section className="cpu-panel capacity-panel"><div className="panel-title"><div><h2>Host capacity</h2><span>Select a gauge for its top consumers</span></div><ActivityIcon size={22} weight="light" /></div><div className="gauge-grid"><UsageGauge label="CPU usage" percent={system?.cpuPercent} detail={`${host?.loadAverage[0]?.toFixed(2) ?? "—"} load average`} tone="cpu" expanded={expandedGauge === "cpu"} onToggle={() => setExpandedGauge((current) => current === "cpu" ? null : "cpu")} processes={processes ?? undefined} /><UsageGauge label="Memory" percent={system?.ram.percent} detail={`${formatBytes(system?.ram.usedMb ? system.ram.usedMb * 1024 * 1024 : null)} of ${formatBytes(system?.ram.totalMb ? system.ram.totalMb * 1024 * 1024 : null)}`} tone="ram" expanded={expandedGauge === "ram"} onToggle={() => setExpandedGauge((current) => current === "ram" ? null : "ram")} processes={processes ?? undefined} /></div></section>
           <section className="services-panel"><div className="panel-title"><div><h2>Needs attention</h2><span>{attentionContainers.length ? `${attentionContainers.length} container${attentionContainers.length === 1 ? "" : "s"} stopped` : "No stopped containers"}</span></div><ChartLineUp size={22} weight="light" /></div><div className="service-list">{attentionContainers.length ? attentionContainers.map((container) => <button key={container.id} onClick={() => setSelectedContainer(container.name)}><span><i className="status-off" />{container.name}</span><small>{container.status}</small></button>) : <p className="healthy-state">No action needed — every container is running.</p>}</div></section>
         </div>
 
         <section className="operations-grid" id="operations">
-          <article className="operation-card"><div className="panel-title"><div><h2>Pi-hole</h2><span>DNS protection</span></div><span className="service-state">Live</span></div><strong className="operation-number">{pihole?.blockedPercent === null || pihole?.blockedPercent === undefined ? "—" : `${pihole.blockedPercent}%`}</strong><p>Blocked today: {pihole?.blockedToday?.toLocaleString() ?? "—"} · {pihole?.uniqueClients ?? "—"} clients</p></article>
+          <article className="operation-card pihole-card"><div className="panel-title"><div><h2>Pi-hole</h2><span>DNS protection</span></div><span className="service-state">Live</span></div><strong className="operation-number">{pihole?.blockedPercent === null || pihole?.blockedPercent === undefined ? "—" : `${pihole.blockedPercent}%`}</strong><p>Blocked today: {pihole?.blockedToday?.toLocaleString() ?? "—"} · {pihole?.uniqueClients ?? "—"} clients</p><div className="blocked-domains"><span>Top blocked domains</span>{pihole?.topBlockedDomains?.length ? <ol>{pihole.topBlockedDomains.map((entry) => <li key={entry.domain}><span title={entry.domain}>{entry.domain}</span><strong>{entry.count.toLocaleString()}</strong></li>)}</ol> : <p>Waiting for Pi-hole domain data…</p>}</div></article>
           <article className="operation-card download-card"><div className="panel-title"><div><h2>Active downloads</h2><span>{downloads?.items.length ?? 0} in progress</span></div><button className="quiet-button" onClick={() => setShowDownloadLogs((current) => !current)}>{showDownloadLogs ? "Hide log" : "View log"}</button></div>{downloads?.items.length ? <ul className="download-list">{downloads.items.map((item) => <li key={item.id}><div><span>{item.name}</span><small>{item.source} · {item.state} · ↓ {formatBytes(item.downloadSpeedBps)}/s</small></div><strong>{item.progress}%</strong><i><b style={{ width: `${item.progress}%` }} /></i></li>)}</ul> : <p>No active downloads.</p>}{showDownloadLogs ? <pre className="download-log">{downloadLogs?.logs ?? "Loading qBittorrent log…"}</pre> : null}</article>
-          <article className="operation-card mounts-card"><div className="panel-title"><div><h2>Storage mounts</h2><span>{host?.storage.length ?? 0} persistent disks</span></div><HardDrives size={21} weight="light" /></div>{host?.storage.length ? <div className="mount-grid">{host.storage.map((mount) => <div className="mount-card" key={mount.mount}><div><HardDrives size={19} weight="duotone" /><span>{mount.mount === "/" ? "System" : mount.mount.split("/").filter(Boolean).at(-1)}</span><strong>{mount.percent}%</strong></div><small>{formatBytes(mount.usedBytes)} of {formatBytes(mount.totalBytes)}</small><i><b style={{ width: `${mount.percent}%` }} /></i></div>)}</div> : <p>Mount details appear when the dashboard runs on Linux.</p>}</article>
           <article className="operation-card network-card"><div className="panel-title"><div><h2>Network trend</h2><span>Live host traffic</span></div><Network size={21} weight="light" /></div><NetworkChart data={networkHistory} /></article>
           <article className="operation-card links-card"><div className="panel-title"><div><h2>Quick links</h2><span>{apps?.apps.length ?? 0} services</span></div><Monitor size={21} weight="light" /></div><div className="quick-links">{apps?.apps.map((app) => <a key={app.id} href={app.url} target="_blank" rel="noreferrer"><span className="app-thumb"><img src={appIconUrl(app.id)} alt="" /></span><small>{app.name}</small></a>)}{!apps?.apps.length ? <p>Set APP_*_URL values to add links.</p> : null}</div></article>
-          <UpdateButton />
         </section>
 
         <section className="log-panel log-panel-bottom" aria-live="polite">
@@ -263,11 +265,12 @@ export function CommandCenter() {
           <div className="panel-title"><div><h2>Crash diagnostics</h2><span>Evidence from the current and previous server boot</span></div><WarningCircle size={22} weight="light" /></div>
           <p className="diagnostic-note">{diagnostics?.note ?? "Loading diagnostics…"}</p>
           <div className="diagnostic-summary"><div><span>Available RAM</span><strong>{diagnostics?.memory.availableMb ?? "—"} MB</strong></div><div><span>Swap free</span><strong>{diagnostics?.memory.swapFreeMb ?? "—"} MB</strong></div><div><span>Server uptime</span><strong>{duration(diagnostics?.uptimeSeconds)}</strong></div></div>
-          <details open><summary>Previous boot — kernel events to inspect after a crash</summary><pre>{diagnostics?.previousBootEvents ?? "Loading previous-boot events…"}</pre></details>
+          <details><summary>Previous boot — kernel events to inspect after a crash</summary><pre>{diagnostics?.previousBootEvents ?? "Loading previous-boot events…"}</pre></details>
           <details><summary>Current boot — kernel events</summary><pre>{diagnostics?.currentKernelEvents ?? "Loading current-boot events…"}</pre></details>
           <details><summary>Recent reboot / shutdown record</summary><pre>{diagnostics?.recentReboots ?? "Loading reboot record…"}</pre></details>
           <details><summary>Memory pressure</summary><pre>{diagnostics?.pressure ?? "Loading memory pressure…"}</pre></details>
         </section>
+        <UpdateButton />
       </section>
 
       {logModal ? <div className="terminal-modal" role="presentation"><div className="log-dialog" role="dialog" aria-modal="true" aria-labelledby="container-log-title"><button className="dialog-close" onClick={() => setLogModal(null)} aria-label="Close container logs"><X size={20} /></button><div className="log-toolbar"><div><h2 id="container-log-title">{logModal.name} logs</h2><span>Live refresh every 2.5 seconds</span></div><button className="quiet-button" onClick={() => void copyCommand(logModal)}><Terminal size={16} />Terminal</button></div>{modalLogsError ? <p className="panel-error">Log stream unavailable: {modalLogsError}</p> : <pre className="log-output">{modalLogs?.logs || "Loading container logs…"}</pre>}</div></div> : null}

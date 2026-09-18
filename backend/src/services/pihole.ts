@@ -9,6 +9,7 @@ export type PiholeStats = {
   blockedPercent: number | null;
   uniqueClients: number | null;
   domainsBeingBlocked: number | null;
+  topBlockedDomains: Array<{ domain: string; count: number }>;
 };
 
 
@@ -38,6 +39,10 @@ type SummaryResponse = {
   unique_clients?: number;
   domains_being_blocked?: number;
   status?: string;
+};
+
+type TopDomainsResponse = {
+  domains?: Array<{ domain?: string; count?: number }>;
 };
 
 
@@ -82,11 +87,10 @@ export async function getPiholeStats(): Promise<PiholeStats> {
     const headers: Record<string, string> = {};
     if (sid) headers["X-FTL-SID"] = sid;
 
-    const summary = await fetchJson<SummaryResponse>(`${base}/api/stats/summary`, {
-      headers,
-    });
+    const summary = await fetchJson<SummaryResponse>(`${base}/api/stats/summary`, { headers });
+    const topDomains = await fetchJson<TopDomainsResponse>(`${base}/api/stats/top_domains?blocked=true&count=5`, { headers }).catch(() => ({ domains: [] }));
 
-    return normalize(summary);
+    return normalize(summary, topDomains);
   } catch {
     clearSession();
   }
@@ -104,7 +108,7 @@ export async function getPiholeStats(): Promise<PiholeStats> {
 }
 
 
-function normalize(summary: SummaryResponse): PiholeStats {
+function normalize(summary: SummaryResponse, topDomains: TopDomainsResponse = {}): PiholeStats {
   const queriesToday =
     summary.queries?.total ?? summary.dns_queries_today ?? null;
   const blockedToday =
@@ -126,5 +130,8 @@ function normalize(summary: SummaryResponse): PiholeStats {
       blockedPercent === null ? null : Number(Number(blockedPercent).toFixed(1)),
     uniqueClients,
     domainsBeingBlocked,
+    topBlockedDomains: (topDomains.domains ?? [])
+      .filter((entry): entry is { domain: string; count: number } => typeof entry.domain === "string" && typeof entry.count === "number")
+      .slice(0, 5),
   };
 }
