@@ -12,6 +12,7 @@ import { apiGet } from "../lib/api";
 import type { AppTile, Container, DiagnosticsReport, DownloadsResponse, HostOverview, PiholeStats, ProcessConsumers, SystemMetrics } from "../lib/types";
 import { usePolling } from "../lib/usePolling";
 import { UpdateButton } from "./UpdateButton";
+import { InferenceLab } from "./InferenceLab";
 
 type ContainersResponse = { containers: Container[] };
 type AppsResponse = { apps: AppTile[] };
@@ -198,6 +199,7 @@ export function CommandCenter() {
           <NavItem icon={Network} label="Network" target="host-status" />
           <NavItem icon={DownloadSimple} label="Downloads" target="operations" />
           <NavItem icon={WarningCircle} label="Diagnostics" target="diagnostics" />
+          <NavItem icon={Lightning} label="AI Lab" target="ai-inference" />
         </nav>
         <div className="sidebar-foot"><span className="connection-mark" aria-hidden="true" /> <span>Live connection</span><small>{host?.hostname ?? "homelab"}</small></div>
       </aside>
@@ -271,6 +273,7 @@ export function CommandCenter() {
           <details><summary>Memory pressure</summary><pre>{diagnostics?.pressure ?? "Loading memory pressure…"}</pre></details>
         </section>
         <UpdateButton />
+        <InferenceLab system={system} host={host} history={history} apps={apps?.apps} />
       </section>
 
       {logModal ? <div className="terminal-modal" role="presentation"><div className="log-dialog" role="dialog" aria-modal="true" aria-labelledby="container-log-title"><button className="dialog-close" onClick={() => setLogModal(null)} aria-label="Close container logs"><X size={20} /></button><div className="log-toolbar"><div><h2 id="container-log-title">{logModal.name} logs</h2><span>Live refresh every 2.5 seconds</span></div><button className="quiet-button" onClick={() => void copyCommand(logModal)}><Terminal size={16} />Terminal</button></div>{modalLogsError ? <p className="panel-error">Log stream unavailable: {modalLogsError}</p> : <pre className="log-output">{modalLogs?.logs || "Loading container logs…"}</pre>}</div></div> : null}
