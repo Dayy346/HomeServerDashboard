@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { ThinkingOrb } from "thinking-orbs";
 import {
-  ActivityIcon, ChartLineUp, Clock, Copy, Cube, Database, DownloadSimple,
-  CaretDown, HardDrives, Lightning, List, Monitor, Network, SquaresFour, Terminal, WarningCircle, X,
+  ActivityIcon, ArrowDown, ArrowUp, ChartLineUp, Clock, Copy, Cube, Database, DownloadSimple,
+  CaretDown, HardDrives, Lightning, List, Monitor, Network, SlidersHorizontal, SquaresFour, Terminal, WarningCircle, X,
 } from "@phosphor-icons/react";
 import { CartesianGrid, Line, LineChart, PolarAngleAxis, RadialBar, RadialBarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { apiGet } from "../lib/api";
@@ -123,8 +123,22 @@ function NetworkChart({ data }: { data: NetworkPoint[] }) {
   );
 }
 
-function NavItem({ icon: Icon, label, target }: { icon: typeof SquaresFour; label: string; target: string }) {
-  return <button className="nav-item" onClick={() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth" })}><Icon size={20} weight="duotone" /><span>{label}</span></button>;
+const NAVIGATION_ITEMS = [
+  { id: "now", icon: SquaresFour, label: "Now", target: "now" },
+  { id: "containers", icon: Cube, label: "Containers", target: "containers" },
+  { id: "gpu", icon: Lightning, label: "AI / Inference", target: "gpu" },
+  { id: "storage", icon: Database, label: "Storage", target: "storage" },
+  { id: "network", icon: Network, label: "Network", target: "host-status" },
+  { id: "downloads", icon: DownloadSimple, label: "Downloads", target: "operations" },
+  { id: "diagnostics", icon: WarningCircle, label: "Diagnostics", target: "diagnostics" },
+  { id: "ai-lab", icon: Lightning, label: "AI Lab", target: "ai-inference" },
+] as const;
+
+type NavigationItem = (typeof NAVIGATION_ITEMS)[number];
+
+function NavItem({ item, active, onSelect }: { item: NavigationItem; active: boolean; onSelect: () => void }) {
+  const Icon = item.icon;
+  return <button className={`nav-item ${active ? "active" : ""}`} onClick={onSelect}><Icon size={20} weight="duotone" /><span>{item.label}</span></button>;
 }
 
 export function CommandCenter() {
@@ -137,7 +151,30 @@ export function CommandCenter() {
   const [logModal, setLogModal] = useState<Container | null>(null);
   const [copied, setCopied] = useState(false);
   const [expandedGauges, setExpandedGauges] = useState<Record<"cpu" | "ram", boolean>>({ cpu: false, ram: false });
+  const [navigationOrder, setNavigationOrder] = useState(() => NAVIGATION_ITEMS.map((item) => item.id));
+  const [activeNavigation, setActiveNavigation] = useState("now");
+  const [organizingNavigation, setOrganizingNavigation] = useState(false);
+  const [navigationReady, setNavigationReady] = useState(false);
   const mounted = useSyncExternalStore(subscribeToHydration, () => true, () => false);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const storedOrder = window.localStorage.getItem("homelab-navigation-order");
+      if (storedOrder) {
+        try {
+          const parsed = JSON.parse(storedOrder) as string[];
+          const valid = parsed.length === NAVIGATION_ITEMS.length && parsed.every((id) => NAVIGATION_ITEMS.some((item) => item.id === id));
+          if (valid) setNavigationOrder(parsed as typeof navigationOrder);
+        } catch { /* Keep the default order if an older preference is invalid. */ }
+      }
+      setNavigationReady(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (navigationReady) window.localStorage.setItem("homelab-navigation-order", JSON.stringify(navigationOrder));
+  }, [navigationOrder, navigationReady]);
   const { data: system, error: systemError } = usePolling<SystemMetrics>(
     (signal) => apiGet<SystemMetrics>("/api/system", signal),
     2_000,
@@ -181,6 +218,23 @@ export function CommandCenter() {
   const running = useMemo(() => containers.filter((container) => container.state === "running"), [containers]);
   const selected = containers.find((container) => container.name === activeName) ?? null;
   const metricsFreshness = history.at(-1)?.time ?? "Connecting";
+  const orderedNavigation = navigationOrder.map((id) => NAVIGATION_ITEMS.find((item) => item.id === id)).filter((item): item is NavigationItem => Boolean(item));
+
+  function moveNavigationItem(id: string, direction: -1 | 1) {
+    setNavigationOrder((current) => {
+      const index = current.indexOf(id as typeof current[number]);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  }
+
+  function resetNavigationOrder() {
+    setNavigationOrder(NAVIGATION_ITEMS.map((item) => item.id));
+    setActiveNavigation("now");
+  }
 
   async function copyCommand(container: Container) {
     setShowTerminal(container);
@@ -191,16 +245,13 @@ export function CommandCenter() {
     <main className="command-center">
       <aside className="sidebar">
         <div className="mark"><Image src="/homelab-mark-v2.png" alt="Dayyan's HomeLab" width={72} height={72} priority /></div>
-        <nav aria-label="Dashboard navigation">
-          <NavItem icon={SquaresFour} label="Now" target="now" />
-          <NavItem icon={Cube} label="Containers" target="containers" />
-          <NavItem icon={Lightning} label="AI / Inference" target="gpu" />
-          <NavItem icon={Database} label="Storage" target="storage" />
-          <NavItem icon={Network} label="Network" target="host-status" />
-          <NavItem icon={DownloadSimple} label="Downloads" target="operations" />
-          <NavItem icon={WarningCircle} label="Diagnostics" target="diagnostics" />
-          <NavItem icon={Lightning} label="AI Lab" target="ai-inference" />
+        <nav aria-label="Dashboard navigation" className={organizingNavigation ? "is-organizing" : ""}>
+          {orderedNavigation.map((item, index) => <div className="nav-item-row" key={item.id}>
+            <NavItem item={item} active={activeNavigation === item.id} onSelect={() => { setActiveNavigation(item.id); document.getElementById(item.target)?.scrollIntoView({ behavior: "smooth" }); }} />
+            {organizingNavigation ? <span className="nav-reorder-controls"><button type="button" onClick={() => moveNavigationItem(item.id, -1)} disabled={index === 0} aria-label={`Move ${item.label} up`}><ArrowUp size={13} /></button><button type="button" onClick={() => moveNavigationItem(item.id, 1)} disabled={index === orderedNavigation.length - 1} aria-label={`Move ${item.label} down`}><ArrowDown size={13} /></button></span> : null}
+          </div>)}
         </nav>
+        <div className="navigation-organizer"><button className="sidebar-organizer" type="button" onClick={() => setOrganizingNavigation((current) => !current)} aria-pressed={organizingNavigation}><SlidersHorizontal size={16} /> <span>{organizingNavigation ? "Done arranging" : "Arrange sections"}</span></button>{organizingNavigation ? <button className="navigation-reset" type="button" onClick={resetNavigationOrder}>Reset default</button> : null}</div>
         <div className="sidebar-foot"><span className="connection-mark" aria-hidden="true" /> <span>Live connection</span><small>{host?.hostname ?? "homelab"}</small></div>
       </aside>
 
