@@ -14,6 +14,14 @@ const nextConfig: NextConfig = {
   turbopack: {
     root,
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/:path*",
+        destination: "http://backend:4000/api/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
