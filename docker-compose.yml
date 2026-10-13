@@ -5,8 +5,17 @@ services:
       dockerfile: backend/Dockerfile
     env_file:
       - .env
+    environment:
+      NETDATA_URL: ${DASHBOARD_NETDATA_URL:-http://host.docker.internal:19999}
+      PIHOLE_URL: ${DASHBOARD_PIHOLE_URL:-http://host.docker.internal:8080}
+      QBITTORRENT_URL: ${DASHBOARD_QBITTORRENT_URL:-http://host.docker.internal:8181}
+      SONARR_URL: ${DASHBOARD_SONARR_URL:-http://host.docker.internal:8989}
+      RADARR_URL: ${DASHBOARD_RADARR_URL:-http://host.docker.internal:7878}
     ports:
       - "4000:4000"
+    pid: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped

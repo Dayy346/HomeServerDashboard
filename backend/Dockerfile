@@ -13,6 +13,9 @@ RUN npm run build
 FROM node:22-bookworm-slim AS backend
 WORKDIR /app
 ENV NODE_ENV=production
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends docker.io procps \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=backend-build /app/package.json ./
 COPY --from=backend-build /app/node_modules ./node_modules
 COPY --from=backend-build /app/dist ./dist
