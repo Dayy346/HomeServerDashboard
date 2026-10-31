@@ -14,8 +14,9 @@ export type UpdateResult = {
 
 const ALLOWLISTED_SCRIPT = [
   "export DEBIAN_FRONTEND=noninteractive",
-  "apt-get update",
-  "apt-get upgrade -y",
+  "export NEEDRESTART_MODE=a",
+  "apt-get -o DPkg::Lock::Timeout=300 update",
+  "apt-get -o DPkg::Lock::Timeout=300 -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold upgrade -y",
 ].join(" && ");
 
 
@@ -24,7 +25,7 @@ export function runOsUpdate(password: string): Promise<UpdateResult> {
     logInfo("OS update requested");
     const child = spawn(
       "sudo",
-      ["-S", "-p", "", "bash", "-lc", ALLOWLISTED_SCRIPT],
+      ["-S", "-p", "", "--", "bash", "-c", ALLOWLISTED_SCRIPT],
       {
         stdio: ["pipe", "pipe", "pipe"],
         env: {
@@ -83,6 +84,13 @@ export function runOsUpdate(password: string): Promise<UpdateResult> {
       });
     });
 
+    // sudo can exit before consuming stdin (for example when permission is denied).
+    // Keep a closed pipe from becoming an unhandled error that crashes the API.
+    child.stdin.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EPIPE" && error.code !== "ERR_STREAM_DESTROYED") {
+        stderr += `\nUnable to send sudo credentials: ${error.message}`;
+      }
+    });
     child.stdin.write(`${password}\n`);
     child.stdin.end();
   });
