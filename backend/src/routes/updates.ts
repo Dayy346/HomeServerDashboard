@@ -18,6 +18,9 @@ updatesRouter.post("/", async (req, res, next) => {
     const result = await runOsUpdate(password);
     res.status(result.ok ? 200 : 500).json({
       ok: result.ok,
+      error: result.ok ? undefined : result.timedOut
+        ? "OS update timed out. Check the server's package manager before retrying."
+        : result.stderr.trim() || result.stdout.trim() || `OS update failed (exit ${result.exitCode}).`,
       exitCode: result.exitCode,
       timedOut: result.timedOut,
       stdout: result.stdout,
