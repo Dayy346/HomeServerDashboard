@@ -1,0 +1,12 @@
+services:
+  frontend:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ""
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "backend:host-gateway"
+    restart: unless-stopped

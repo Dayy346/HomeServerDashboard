@@ -1,5 +1,6 @@
 import { env } from "../lib/env.js";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { logError, logInfo } from "../lib/logger.js";
 
 
@@ -21,11 +22,22 @@ const ALLOWLISTED_SCRIPT = [
 
 
 export function runOsUpdate(password: string): Promise<UpdateResult> {
+  const failure = (stderr: string): Promise<UpdateResult> => Promise.resolve({
+    ok: false, exitCode: null, stdout: "", stderr, timedOut: false,
+  });
+  if (existsSync("/.dockerenv") || existsSync("/run/.containerenv")) {
+    return failure("Host OS updates require the host backend. Run sudo bash deploy/install-host-backend.sh from the project folder on your server, then retry.");
+  }
+  const sudoPath = ["/usr/bin/sudo", "/bin/sudo"].find(existsSync);
+  const isRoot = process.getuid?.() === 0;
+  if (!isRoot && !sudoPath) {
+    return failure("sudo is missing on the host. Run sudo bash deploy/install-host-backend.sh (or run it from a root shell) to install the host backend and its prerequisites.");
+  }
   return new Promise((resolve) => {
     logInfo("OS update requested");
     const child = spawn(
-      "sudo",
-      ["-S", "-p", "", "--", "bash", "-c", ALLOWLISTED_SCRIPT],
+      isRoot ? "/bin/bash" : sudoPath!,
+      isRoot ? ["-c", ALLOWLISTED_SCRIPT] : ["-S", "-p", "", "--", "/bin/bash", "-c", ALLOWLISTED_SCRIPT],
       {
         stdio: ["pipe", "pipe", "pipe"],
         env: {
@@ -91,7 +103,7 @@ export function runOsUpdate(password: string): Promise<UpdateResult> {
         stderr += `\nUnable to send sudo credentials: ${error.message}`;
       }
     });
-    child.stdin.write(`${password}\n`);
+    if (!isRoot) child.stdin.write(`${password}\n`);
     child.stdin.end();
   });
 }
